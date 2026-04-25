@@ -1,0 +1,63 @@
+# =========================
+# Java / Spring (backend)
+# =========================
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/settings.xml
+backend/.sdkmanrc
+backend/.mvn/maven.config
+
+# Evita ignorar target dentro de src (boa prática do template Spring)
+!backend/**/src/main/**/target/
+!backend/**/src/test/**/target/
+
+
+# =========================
+# Node / Next (frontend)
+# =========================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+
+# =========================
+# Logs
+# =========================
+*.log
+
+
+# =========================
+# IntelliJ
+# =========================
+backend/.idea/
+backend/*.iml
+
+
+# =========================
+# VS Code (opcional)
+# =========================
+frontend/.vscode/
+
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+
+# =========================
+# Env / secrets
+# =========================
+.env
+.env.*
+
+
+# =========================
+# Build geral
+# =========================
+run-local.sh
+stop-local.sh
+# =========================
+dist/
+build/
