@@ -1,6 +1,7 @@
 package com.joaolucas.finance_tracker.security;
 
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Duration;
 import java.util.Date;
@@ -24,7 +25,10 @@ public class JwtService {
     private final Key key;
 
     public JwtService(@Value ("${jwt.secret}") String secret) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        if (secret.length() < 32) {
+            throw new IllegalArgumentException("JWT secret must be at least 256 bits");
+        }
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(Long userId) {

@@ -46,17 +46,9 @@ class TransactionControllerTest extends BaseControllerTest {
     @MockitoBean
     private JwtService jwtService;
 
-    // ======================
-    // CREATE
-    // ======================
-
     @Test
     void create$shouldReturn200WhenSuccess() throws Exception {
-        TransactionRequestDTO request = new TransactionRequestDTO();
-        request.setCategoryId(10L);
-        request.setDate(LocalDate.now());
-        request.setAmount(100.0);
-        request.setType("INCOME");
+        TransactionRequestDTO request = getValidRequestDTO();
 
         TransactionResponseDTO response = new TransactionResponseDTO();
 
@@ -72,11 +64,7 @@ class TransactionControllerTest extends BaseControllerTest {
 
     @Test
     void create$shouldReturn403WhenCategoryIsInvalid() throws Exception {
-        TransactionRequestDTO request = new TransactionRequestDTO();
-        request.setCategoryId(10L);
-        request.setDate(LocalDate.now());
-        request.setAmount(100.0);
-        request.setType("INCOME");
+        TransactionRequestDTO request = getValidRequestDTO();
 
         when(transactionService.create(any()))
                 .thenThrow(new ForbiddenException("Categoria inválida para este usuário"));
@@ -93,11 +81,7 @@ class TransactionControllerTest extends BaseControllerTest {
 
     @Test
     void create$shouldReturn500WhenUnexpectedErrorOccurs() throws Exception {
-        TransactionRequestDTO request = new TransactionRequestDTO();
-        request.setCategoryId(10L);
-        request.setDate(LocalDate.now());
-        request.setAmount(100.0);
-        request.setType("INCOME");
+        TransactionRequestDTO request = getValidRequestDTO();
 
         when(transactionService.create(any()))
                 .thenThrow(new RuntimeException("Erro inesperado"));
@@ -114,7 +98,6 @@ class TransactionControllerTest extends BaseControllerTest {
     @Test
     void create$shouldReturn400WhenValidationFails() throws Exception {
         TransactionRequestDTO request = new TransactionRequestDTO();
-        // sem categoryId → deve disparar validação
 
         mockMvc.perform(post("/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -124,12 +107,8 @@ class TransactionControllerTest extends BaseControllerTest {
                 .andExpect(jsonPath("$.errors").isArray());
     }
 
-    // ======================
-    // GET
-    // ======================
-
     @Test
-    void getAll$shouldReturn200WithList() throws Exception {
+    void getAllFromAuthenticatedUser$shouldReturn200WithList() throws Exception {
         when(transactionService.getByAuthenticatedUser())
                 .thenReturn(List.of(new TransactionResponseDTO()));
 
@@ -140,12 +119,21 @@ class TransactionControllerTest extends BaseControllerTest {
     }
 
     @Test
-    void getAll$shouldReturnEmptyList() throws Exception {
+    void getAllFromAuthenticatedUser$shouldReturn200WithEmptyList() throws Exception {
         when(transactionService.getByAuthenticatedUser())
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/transactions"))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
+    }
+
+    private static TransactionRequestDTO getValidRequestDTO() {
+        TransactionRequestDTO request = new TransactionRequestDTO();
+        request.setCategoryId(10L);
+        request.setDate(LocalDate.now());
+        request.setAmount(100.0);
+        request.setType("INCOME");
+        return request;
     }
 }

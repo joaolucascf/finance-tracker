@@ -35,7 +35,7 @@ public class TransactionController {
     }
 
     @GetMapping
-    public List<TransactionResponseDTO> getAllFromAuthenticadeUser() {
+    public List<TransactionResponseDTO> getAllFromAuthenticatedUser() {
         return transactionService.getByAuthenticatedUser();
     }
 }
