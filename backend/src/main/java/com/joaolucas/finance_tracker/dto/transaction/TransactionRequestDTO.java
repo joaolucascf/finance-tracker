@@ -1,9 +1,11 @@
 package com.joaolucas.finance_tracker.dto.transaction;
 
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
-import jakarta.validation.constraints.NotBlank;
+import com.joaolucas.finance_tracker.entity.TransactionType;
+
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
@@ -14,10 +16,10 @@ public class TransactionRequestDTO {
 
     @NotNull
     @Positive
-    private Double amount;
+    private BigDecimal amount;
 
-    @NotBlank
-    private String type; // TODO: melhorar isso.
+    @NotNull
+    private TransactionType type;
 
     private String description;
 

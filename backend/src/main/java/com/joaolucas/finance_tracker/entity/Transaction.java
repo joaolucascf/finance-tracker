@@ -3,6 +3,7 @@ package com.joaolucas.finance_tracker.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -19,7 +20,7 @@ public class Transaction {
     private Long id;
 
     @Column(nullable = false)
-    private Double amount;
+    private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

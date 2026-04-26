@@ -25,7 +25,7 @@ public class TransactionMapper {
                 .builder()
                 .id(transaction.getId())
                 .amount(transaction.getAmount())
-                .type(transaction.getType().name())
+                .type(transaction.getType())
                 .description(transaction.getDescription())
                 .date(transaction.getDate())
                 .category(categoryMapper.toDTO(transaction.getCategory()))
@@ -35,7 +35,7 @@ public class TransactionMapper {
     public Transaction toEntity(TransactionRequestDTO dto, User user, Category category) {
         return Transaction.builder()
                 .amount(dto.getAmount())
-                .type(TransactionType.valueOf(dto.getType()))
+                .type(dto.getType())
                 .description(dto.getDescription())
                 .date(dto.getDate())
                 .user(user)
