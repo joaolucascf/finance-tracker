@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.joaolucas.finance_tracker.config.BaseControllerTest;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionRequestDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
+import com.joaolucas.finance_tracker.entity.TransactionType;
 import com.joaolucas.finance_tracker.exception.ForbiddenException;
 import com.joaolucas.finance_tracker.exception.GlobalExceptionHandler;
 import com.joaolucas.finance_tracker.security.JwtService;
@@ -132,8 +134,8 @@ class TransactionControllerTest extends BaseControllerTest {
         TransactionRequestDTO request = new TransactionRequestDTO();
         request.setCategoryId(10L);
         request.setDate(LocalDate.now());
-        request.setAmount(100.0);
-        request.setType("INCOME");
+        request.setAmount(BigDecimal.valueOf(100.0));
+        request.setType(TransactionType.INCOME);
         return request;
     }
 }
