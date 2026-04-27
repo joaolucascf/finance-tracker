@@ -10,6 +10,7 @@ import com.joaolucas.finance_tracker.dto.category.CategoryResponseDTO;
 import com.joaolucas.finance_tracker.entity.Category;
 import com.joaolucas.finance_tracker.entity.User;
 import com.joaolucas.finance_tracker.exception.ForbiddenException;
+import com.joaolucas.finance_tracker.exception.NotFoundException;
 import com.joaolucas.finance_tracker.mapper.CategoryMapper;
 import com.joaolucas.finance_tracker.repository.CategoryRepository;
 
@@ -55,13 +56,21 @@ public class CategoryService {
     }
 
     public Category getIfAvailableForUser(Long categoryId, Long userId) {
+
         if (categoryId == null || userId == null) {
             return null;
         }
 
-        return this.categoryRepository
-                .findCategoryForUserIfAvailable(categoryId, userId)
-                .orElseThrow(() -> new ForbiddenException("Categoria inválida para este usuário"));
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new NotFoundException("Categoria não encontrada"));
 
+        boolean isOwner = category.getUser().getId().equals(userId);
+        boolean isDefault = category.isDefault();
+
+        if (!isOwner && !isDefault) {
+            throw new ForbiddenException("Categoria inválida para este usuário");
+        }
+
+        return category;
     }
 }
