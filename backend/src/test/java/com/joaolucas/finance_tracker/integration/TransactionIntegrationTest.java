@@ -22,7 +22,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionRequestDTO;
 import com.joaolucas.finance_tracker.entity.Category;
 import com.joaolucas.finance_tracker.entity.TransactionType;
@@ -34,6 +33,7 @@ import com.joaolucas.finance_tracker.security.JwtService;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import tools.jackson.databind.ObjectMapper;
 
 
 @SpringBootTest
@@ -98,7 +98,11 @@ class TransactionIntegrationTest {
         mockMvc.perform(post("/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message").value("Token não fornecido"))
+                .andExpect(jsonPath("$.path").value("/transactions"));
     }
 
     @Test
@@ -110,7 +114,11 @@ class TransactionIntegrationTest {
                         .header("Authorization", "Bearer invalidToken")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message").value("Token inválido"))
+                .andExpect(jsonPath("$.path").value("/transactions"));
     }
 
     @Test
@@ -121,7 +129,11 @@ class TransactionIntegrationTest {
                         .header("Authorization", "Bearer " + expiredToken(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message").value("Token expirado"))
+                .andExpect(jsonPath("$.path").value("/transactions"));
     }
 
     @Test
@@ -141,7 +153,11 @@ class TransactionIntegrationTest {
                         .header("Authorization", bearerToken(otherUser.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.error").value("Forbidden"))
+                .andExpect(jsonPath("$.message").value("Categoria inválida para este usuário"))
+                .andExpect(jsonPath("$.path").value("/transactions"));
     }
 
     @Test
@@ -153,7 +169,11 @@ class TransactionIntegrationTest {
                         .header("Authorization", bearerToken(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value("Categoria não encontrada"))
+                .andExpect(jsonPath("$.path").value("/transactions"));
     }
 
     @Test
@@ -167,7 +187,12 @@ class TransactionIntegrationTest {
                         .header("Authorization", bearerToken(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/transactions"))
+                .andExpect(jsonPath("$.errors").isArray());
     }
 
     private TransactionRequestDTO createValidTransactionRequest(Long categoryId) {
