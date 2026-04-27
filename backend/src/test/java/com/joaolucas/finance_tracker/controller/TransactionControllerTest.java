@@ -16,7 +16,6 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -24,20 +23,24 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.joaolucas.finance_tracker.config.BaseControllerTest;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionRequestDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
 import com.joaolucas.finance_tracker.entity.TransactionType;
 import com.joaolucas.finance_tracker.exception.ForbiddenException;
 import com.joaolucas.finance_tracker.exception.GlobalExceptionHandler;
-import com.joaolucas.finance_tracker.security.JwtService;
+import com.joaolucas.finance_tracker.security.JwtFilter;
 import com.joaolucas.finance_tracker.service.TransactionService;
+
+import tools.jackson.databind.ObjectMapper;
 
 
 @WebMvcTest (TransactionController.class)
-@Import ({ GlobalExceptionHandler.class, JacksonAutoConfiguration.class })
+@Import ({ GlobalExceptionHandler.class })
 @AutoConfigureMockMvc (addFilters = false)
-class TransactionControllerTest extends BaseControllerTest {
+class TransactionControllerTest {
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,7 +49,7 @@ class TransactionControllerTest extends BaseControllerTest {
     private TransactionService transactionService;
 
     @MockitoBean
-    private JwtService jwtService;
+    private JwtFilter jwtFilter;
 
     @Test
     void create$shouldReturn200WhenSuccess() throws Exception {
@@ -58,7 +61,7 @@ class TransactionControllerTest extends BaseControllerTest {
 
         mockMvc.perform(post("/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(request)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
         verify(transactionService).create(any());
@@ -73,7 +76,7 @@ class TransactionControllerTest extends BaseControllerTest {
 
         mockMvc.perform(post("/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(request)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.error").value("Forbidden"))
@@ -90,7 +93,7 @@ class TransactionControllerTest extends BaseControllerTest {
 
         mockMvc.perform(post("/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(request)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value(500))
                 .andExpect(jsonPath("$.error").value("Internal Server Error"))
@@ -103,7 +106,7 @@ class TransactionControllerTest extends BaseControllerTest {
 
         mockMvc.perform(post("/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(request)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.errors").isArray());
