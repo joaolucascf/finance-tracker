@@ -7,11 +7,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Date;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -28,6 +31,9 @@ import com.joaolucas.finance_tracker.repository.CategoryRepository;
 import com.joaolucas.finance_tracker.repository.TransactionRepository;
 import com.joaolucas.finance_tracker.repository.UserRepository;
 import com.joaolucas.finance_tracker.security.JwtService;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 
 
 @SpringBootTest
@@ -51,22 +57,21 @@ class TransactionIntegrationTest {
     @Autowired
     private JwtService jwtService;
 
+    @Value ("${jwt.secret}")
+    private String secret;
     private User user;
+    private Category category;
+    private LocalDate today;
 
     @BeforeEach
     void setup() {
-        this.user = userRepository.save(User.builder()
-                .name("John")
-                .email("john@email.com")
-                .password("myStrongPassword123")
-                .build()
-        );
+        this.user = createUser("John", "john@email.com");
+        this.category = createCategory(user, "Food");
+        today = LocalDate.now();
     }
 
     @Test
     void shouldCreateTransaction_whenValidRequest() throws Exception {
-        Category category = this.createCategory("Food");
-
         TransactionRequestDTO request = createValidTransactionRequest(category.getId());
 
         // when + then
@@ -78,28 +83,98 @@ class TransactionIntegrationTest {
                 .andExpect(jsonPath("$.description").value("Detailed description"))
                 .andExpect(jsonPath("$.amount").value(DEFAULT_AMOUNT))
                 .andExpect(jsonPath("$.type").value("EXPENSE"))
-                .andExpect(jsonPath("$.date").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$.date").value(today.toString()))
                 .andExpect(jsonPath("$.category.id").value(category.getId()))
                 .andExpect(jsonPath("$.category.name").value("Food"));
 
         assertEquals(1, transactionRepository.count());
     }
 
-    private Category createCategory(String name) {
-        return this.categoryRepository.save(
-                Category.builder()
-                        .name(name)
-                        .user(user)
-                        .isDefault(false)
+    @Test
+    void shouldReturn401_whenMissingAuthorizationHeader() throws Exception {
+        TransactionRequestDTO request = createValidTransactionRequest(category.getId());
+
+        // when + then
+        mockMvc.perform(post("/transactions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401_whenInvalidToken() throws Exception {
+        TransactionRequestDTO request = createValidTransactionRequest(category.getId());
+
+        // when + then
+        mockMvc.perform(post("/transactions")
+                        .header("Authorization", "Bearer invalidToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401_whenExpiredToken() throws Exception {
+        TransactionRequestDTO request = createValidTransactionRequest(category.getId());
+
+        mockMvc.perform(post("/transactions")
+                        .header("Authorization", "Bearer " + expiredToken(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn403_whenCategoryDoesNotBelongToUser() throws Exception {
+        User otherUser = userRepository.save(
+                User.builder()
+                        .name("Mary")
+                        .email("mary@email.com")
+                        .password("maryStrongPassword123")
                         .build()
         );
+
+        TransactionRequestDTO request = createValidTransactionRequest(category.getId());
+
+        // when + then
+        mockMvc.perform(post("/transactions")
+                        .header("Authorization", bearerToken(otherUser.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturn404_whenCategoryDoesNotExist() throws Exception {
+        TransactionRequestDTO request = createValidTransactionRequest(999L);
+
+        // when + then
+        mockMvc.perform(post("/transactions")
+                        .header("Authorization", bearerToken(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturn400_whenInvalidDataInRequest() throws Exception {
+        TransactionRequestDTO request = new TransactionRequestDTO();
+        request.setType(null);
+        request.setDate(null);
+        request.setAmount(BigDecimal.valueOf(-1));
+
+        mockMvc.perform(post("/transactions")
+                        .header("Authorization", bearerToken(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 
     private TransactionRequestDTO createValidTransactionRequest(Long categoryId) {
         TransactionRequestDTO request = new TransactionRequestDTO();
         request.setAmount(DEFAULT_AMOUNT);
         request.setType(TransactionType.EXPENSE);
-        request.setDate(LocalDate.now());
+        request.setDate(today);
         request.setDescription("Detailed description");
         request.setCategoryId(categoryId);
         return request;
@@ -107,5 +182,32 @@ class TransactionIntegrationTest {
 
     private String bearerToken(Long userId) {
         return "Bearer " + this.jwtService.generateToken(userId);
+    }
+
+    private String expiredToken(Long userId) {
+        return Jwts.builder()
+                .setSubject(String.valueOf(userId))
+                .setIssuedAt(new Date(System.currentTimeMillis() - 60000))
+                .setExpiration(new Date(System.currentTimeMillis() - 1000))
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
+                .compact();
+    }
+
+    private User createUser(String name, String email) {
+        return userRepository.save(User.builder()
+                .name(name)
+                .email(email)
+                .password("password")
+                .build());
+    }
+
+    private Category createCategory(User user, String name) {
+        return categoryRepository.save(
+                Category.builder()
+                        .name(name)
+                        .user(user)
+                        .isDefault(false)
+                        .build()
+        );
     }
 }
