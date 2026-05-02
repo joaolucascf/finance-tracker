@@ -51,7 +51,7 @@ public class CategoryService {
 
     public List<CategoryResponseDTO> getAvailableCategoriesForAuthenticatedUsers() {
         User user = this.authService.getAuthenticatedUser();
-        return this.categoryRepository.findByUserIdOrIsDefaultIsTrue(user.getId())
+        return this.categoryRepository.findAllForUser(user.getId())
                 .stream().map(this.categoryMapper::toDTO).toList();
     }
 
@@ -64,11 +64,12 @@ public class CategoryService {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new NotFoundException("Categoria não encontrada"));
 
-        boolean isOwner = category.getUser().getId().equals(userId);
-        boolean isDefault = category.isDefault();
-
-        if (!isOwner && !isDefault) {
-            throw new ForbiddenException("Categoria inválida para este usuário");
+        boolean isDefaultCategory = category.getDefaultCategory();
+        if (!isDefaultCategory) {
+            boolean isOwner = category.getUser().getId().equals(userId);
+            if (!isOwner) {
+                throw new ForbiddenException("Categoria inválida para este usuário");
+            }
         }
 
         return category;
