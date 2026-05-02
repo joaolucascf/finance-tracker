@@ -21,7 +21,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,9 +41,8 @@ import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles ("test")
 @Transactional
-class TransactionIntegrationTest {
+class TransactionIntegrationTest extends AbstractIntegrationTest {
 
     private static final BigDecimal DEFAULT_AMOUNT = BigDecimal.valueOf(25.50);
 
@@ -346,7 +344,7 @@ class TransactionIntegrationTest {
                 Category.builder()
                         .name(name)
                         .user(user)
-                        .isDefault(false)
+                        .defaultCategory(false)
                         .build()
         );
     }
