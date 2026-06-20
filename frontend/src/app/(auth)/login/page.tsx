@@ -5,31 +5,71 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import AuthLayout from "@/components/layout/AuthLayout";
 
-const inputClass =
-  "w-full bg-[var(--color-raised)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-text)] text-sm placeholder:text-[var(--color-muted)] focus:outline-none focus:border-[var(--color-teal)] transition-colors";
+const inputClass = (error?: string) =>
+  `w-full bg-[var(--color-raised)] border rounded-lg px-3 py-2.5 text-[var(--color-text)] text-sm placeholder:text-[var(--color-muted)] focus:outline-none transition-colors ${
+    error
+      ? "border-[var(--color-expense)] focus:border-[var(--color-expense)]"
+      : "border-[var(--color-border)] focus:border-[var(--color-teal)]"
+  }`;
+
+type Errors = { email?: string; password?: string; general?: string };
+
+function validate(email: string, password: string): Errors {
+  const errors: Errors = {};
+  if (!email.trim()) errors.email = "Email obrigatório";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Email inválido";
+  if (!password) errors.password = "Senha obrigatória";
+  return errors;
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<Errors>({});
+  const [loading, setLoading] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:8080/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    const validation = validate(email, password);
+    if (Object.keys(validation).length > 0) {
+      setErrors(validation);
+      return;
+    }
 
-    const data = await res.json();
-    login(data.token);
+    setErrors({});
+    setLoading(true);
+
+    try {
+      const res = await fetch("http://localhost:8080/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrors({ general: data.message ?? "Credenciais inválidas" });
+        return;
+      }
+
+      login(data.token);
+    } catch {
+      setErrors({ general: "Não foi possível conectar ao servidor. Tente novamente." });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <AuthLayout title="Bem-vindo de volta" description="Acesse sua conta para continuar">
       <form onSubmit={handleLogin} className="space-y-5">
+        {errors.general && (
+          <p className="text-[var(--color-expense)] text-sm text-center">{errors.general}</p>
+        )}
+
         <div className="space-y-1.5">
           <label className="block text-xs text-[var(--color-secondary)] font-medium uppercase tracking-wide">
             Email
@@ -38,9 +78,10 @@ export default function LoginPage() {
             type="email"
             placeholder="seu@email.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
+            onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: undefined })); }}
+            className={inputClass(errors.email)}
           />
+          {errors.email && <p className="text-[var(--color-expense)] text-xs">{errors.email}</p>}
         </div>
 
         <div className="space-y-1.5">
@@ -51,25 +92,24 @@ export default function LoginPage() {
             type="password"
             placeholder="••••••••"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
+            onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: undefined })); }}
+            className={inputClass(errors.password)}
           />
+          {errors.password && <p className="text-[var(--color-expense)] text-xs">{errors.password}</p>}
         </div>
 
         <button
           type="submit"
-          className="w-full py-3 rounded-lg bg-[var(--color-teal)] hover:bg-[var(--color-teal-dark)] text-white font-semibold text-sm transition-colors cursor-pointer mt-2"
+          disabled={loading}
+          className="w-full py-3 rounded-lg bg-[var(--color-teal)] hover:bg-[var(--color-teal-dark)] text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2"
         >
-          Entrar
+          {loading ? "Entrando..." : "Entrar"}
         </button>
       </form>
 
       <p className="text-center text-xs text-[var(--color-muted)] mt-8">
         Não tem uma conta?{" "}
-        <Link
-          href="/register"
-          className="text-[var(--color-teal)] hover:underline font-medium"
-        >
+        <Link href="/register" className="text-[var(--color-teal)] hover:underline font-medium">
           Criar conta
         </Link>
       </p>

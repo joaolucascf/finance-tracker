@@ -12,20 +12,23 @@ type Props = {
   disabled?: boolean;
 };
 
-const initialState: FormState = {
+const getInitialState = (): FormState => ({
   description: "",
   amount: "",
   type: "EXPENSE",
   categoryId: null,
-  date: "",
-};
+  date: (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })(),
+});
 
 const inputClass =
   "w-full bg-[var(--color-raised)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-text)] text-sm placeholder:text-[var(--color-muted)] focus:outline-none focus:border-[var(--color-teal)] transition-colors disabled:opacity-50";
 
 export default function TransactionForm({ onSuccess, disabled }: Props) {
   const { categories, loading } = useCategories();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>(getInitialState);
   const [error, setError] = useState<ApiError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -75,7 +78,7 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
       setError(null);
       await createTransaction({ ...form, amount: Number(form.amount) });
       onSuccess();
-      setForm(initialState);
+      setForm(getInitialState());
     } catch (err) {
       if (isApiError(err)) setError(err);
       else console.error("Erro inesperado: ", err);
