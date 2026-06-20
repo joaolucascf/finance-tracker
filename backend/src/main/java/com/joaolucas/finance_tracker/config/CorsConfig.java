@@ -19,7 +19,7 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(of("http://localhost:3000"));
-        config.setAllowedMethods(of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(of("*"));
         config.setAllowCredentials(true);
 
