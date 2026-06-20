@@ -58,7 +58,7 @@ export default function RegisterPage() {
         return;
       }
 
-      login(data.token);
+      login(data.token, data.refreshToken);
     } catch {
       setErrors({ general: "Não foi possível conectar ao servidor. Tente novamente." });
     } finally {

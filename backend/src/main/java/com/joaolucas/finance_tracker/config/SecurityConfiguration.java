@@ -42,7 +42,7 @@ public class SecurityConfiguration {
                         .authenticationEntryPoint(entryPoint)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

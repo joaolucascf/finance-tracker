@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import com.joaolucas.finance_tracker.dto.auth.AuthResponseDTO;
 import com.joaolucas.finance_tracker.dto.auth.LoginRequestDTO;
 import com.joaolucas.finance_tracker.dto.auth.RegisterRequestDTO;
+import com.joaolucas.finance_tracker.entity.RefreshToken;
 import com.joaolucas.finance_tracker.entity.User;
 import com.joaolucas.finance_tracker.mapper.UserMapper;
 import com.joaolucas.finance_tracker.repository.UserRepository;
@@ -21,13 +22,15 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final UserRepository userRepository;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(JwtService jwtService, PasswordEncoder passwordEncoder, UserMapper userMapper,
-            UserRepository userRepository) {
+            UserRepository userRepository, RefreshTokenService refreshTokenService) {
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.userMapper = userMapper;
         this.userRepository = userRepository;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public AuthResponseDTO doRegister(RegisterRequestDTO dto) {
@@ -37,14 +40,9 @@ public class AuthService {
         }
 
         User user = this.userMapper.toEntity(dto, passwordEncoder.encode(dto.getPassword()));
-
         userRepository.save(user);
 
-        String token = jwtService.generateToken(user.getId());
-
-        return AuthResponseDTO.builder()
-                .token(token)
-                .build();
+        return buildAuthResponse(user);
     }
 
     public AuthResponseDTO doLogin(LoginRequestDTO dto) {
@@ -56,11 +54,17 @@ public class AuthService {
             throw new RuntimeException("Credenciais inválidas");
         }
 
-        String token = jwtService.generateToken(user.getId());
+        return buildAuthResponse(user);
+    }
 
-        return AuthResponseDTO.builder()
-                .token(token)
-                .build();
+    public AuthResponseDTO doRefresh(String refreshTokenValue) {
+        User user = refreshTokenService.validateAndRotate(refreshTokenValue);
+        return buildAuthResponse(user);
+    }
+
+    public void doLogout() {
+        User user = getAuthenticatedUser();
+        refreshTokenService.revoke(user);
     }
 
     public Long getAuthenticatedUserId() {
@@ -74,5 +78,15 @@ public class AuthService {
         Long userId = getAuthenticatedUserId();
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário autenticado não encontrado"));
+    }
+
+    private AuthResponseDTO buildAuthResponse(User user) {
+        String accessToken = jwtService.generateToken(user.getId());
+        RefreshToken refreshToken = refreshTokenService.generate(user);
+
+        return AuthResponseDTO.builder()
+                .token(accessToken)
+                .refreshToken(refreshToken.getToken())
+                .build();
     }
 }

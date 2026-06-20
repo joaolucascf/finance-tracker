@@ -1,9 +1,11 @@
-import { logout } from "@/lib/auth";
+import { logout, tryRefreshToken } from "@/lib/auth";
 import { ApiError } from "@/types/api-error";
 
 const API_URL = "http://localhost:8080";
 
-export async function apiFetch(endpoint: string, options: RequestInit = {}) {
+let refreshing: Promise<boolean> | null = null;
+
+export async function apiFetch(endpoint: string, options: RequestInit = {}, retry = true) {
   const token = localStorage.getItem("token");
 
   const response: Response = await fetch(`${API_URL}${endpoint}`, {
@@ -15,8 +17,19 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     },
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && retry) {
+    if (!refreshing) {
+      refreshing = tryRefreshToken().finally(() => { refreshing = null; });
+    }
+
+    const refreshed = await refreshing;
+
+    if (refreshed) {
+      return apiFetch(endpoint, options, false);
+    }
+
     logout();
+    throw { message: "Sessão expirada" } as ApiError;
   }
 
   let data = null;

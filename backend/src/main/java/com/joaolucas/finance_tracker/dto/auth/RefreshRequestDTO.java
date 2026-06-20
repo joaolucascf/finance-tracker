@@ -1,11 +1,11 @@
 package com.joaolucas.finance_tracker.dto.auth;
 
-import lombok.Builder;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
-@Builder
 @Data
-public class AuthResponseDTO {
-    private String token;
+public class RefreshRequestDTO {
+
+    @NotBlank
     private String refreshToken;
 }
