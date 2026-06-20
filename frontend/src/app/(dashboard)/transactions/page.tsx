@@ -5,6 +5,7 @@ import TransactionForm from "./components/TransactionForm";
 import { useTransactions } from "@/hooks/useTransactions";
 import { Modal } from "@/components/ui/Modal";
 import { Transaction } from "@/types/transactions";
+import { deleteTransaction } from "@/services/transactions";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -23,6 +24,20 @@ function formatDate(dateStr: string) {
 export default function TransactionsPage() {
   const { transactions, loading, error, reload } = useTransactions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function handleConfirmDelete() {
+    if (!transactionToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteTransaction(transactionToDelete.id);
+      setTransactionToDelete(null);
+      reload();
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   const totalIncome = transactions
     .filter((t) => t.type === "INCOME")
@@ -137,6 +152,7 @@ export default function TransactionsPage() {
               key={t.id}
               transaction={t}
               last={i === transactions.length - 1}
+              onDelete={() => setTransactionToDelete(t)}
             />
           ))}
         </div>
@@ -153,6 +169,43 @@ export default function TransactionsPage() {
           }}
         />
       </Modal>
+
+      <Modal
+        isOpen={!!transactionToDelete}
+        onClose={() => !isDeleting && setTransactionToDelete(null)}
+      >
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-[var(--color-text)] text-lg font-semibold mb-1">
+              Excluir transação
+            </h2>
+            <p className="text-[var(--color-secondary)] text-sm">
+              Tem certeza que deseja excluir{" "}
+              <span className="font-medium text-[var(--color-text)]">
+                &quot;{transactionToDelete?.description}&quot;
+              </span>
+              ? Essa ação não pode ser desfeita.
+            </p>
+          </div>
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => setTransactionToDelete(null)}
+              disabled={isDeleting}
+              className="px-4 py-2 text-sm font-medium text-[var(--color-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-raised)] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors cursor-pointer disabled:opacity-60"
+              style={{ backgroundColor: "var(--color-expense)" }}
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -160,15 +213,17 @@ export default function TransactionsPage() {
 function TransactionItem({
   transaction: t,
   last,
+  onDelete,
 }: {
   transaction: Transaction;
   last: boolean;
+  onDelete: () => void;
 }) {
   const isIncome = t.type === "INCOME";
 
   return (
     <div
-      className={`flex items-center gap-4 px-5 py-4 hover:bg-[var(--color-raised)] transition-colors ${
+      className={`group flex items-center gap-4 px-5 py-4 hover:bg-[var(--color-raised)] transition-colors ${
         !last ? "border-b border-[var(--color-border)]" : ""
       }`}
     >
@@ -199,16 +254,30 @@ function TransactionItem({
         {formatDate(t.date)}
       </span>
 
-      {/* Amount */}
-      <span
-        className="text-sm font-semibold flex-shrink-0 w-28 text-right"
-        style={{
-          color: isIncome ? "var(--color-income)" : "var(--color-expense)",
-        }}
-      >
-        {isIncome ? "+" : "−"}
-        {formatCurrency(t.amount)}
-      </span>
+      {/* Amount + delete */}
+      <div className="flex items-center gap-2 flex-shrink-0 w-28 justify-end">
+        <button
+          onClick={onDelete}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-expense)] hover:bg-[var(--color-border)] cursor-pointer"
+          aria-label="Excluir transação"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+        </button>
+        <span
+          className="text-sm font-semibold text-right"
+          style={{
+            color: isIncome ? "var(--color-income)" : "var(--color-expense)",
+          }}
+        >
+          {isIncome ? "+" : "−"}
+          {formatCurrency(t.amount)}
+        </span>
+      </div>
     </div>
   );
 }

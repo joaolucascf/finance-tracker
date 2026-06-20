@@ -10,6 +10,8 @@ import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
 import com.joaolucas.finance_tracker.entity.Category;
 import com.joaolucas.finance_tracker.entity.Transaction;
 import com.joaolucas.finance_tracker.entity.User;
+import com.joaolucas.finance_tracker.exception.ForbiddenException;
+import com.joaolucas.finance_tracker.exception.NotFoundException;
 import com.joaolucas.finance_tracker.mapper.TransactionMapper;
 import com.joaolucas.finance_tracker.repository.TransactionRepository;
 
@@ -50,5 +52,15 @@ public class TransactionService {
                 .stream()
                 .map(transactionMapper::toDTO)
                 .toList();
+    }
+
+    public void delete(Long id) {
+        User authenticatedUser = this.authService.getAuthenticatedUser();
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Transação não encontrada"));
+        if (!transaction.getUser().getId().equals(authenticatedUser.getId())) {
+            throw new ForbiddenException("Acesso negado");
+        }
+        transactionRepository.delete(transaction);
     }
 }

@@ -10,3 +10,7 @@ export async function createTransaction(data: any) {
     body: JSON.stringify(data),
   });
 }
+
+export async function deleteTransaction(id: number) {
+  return apiFetch(`/transactions/${id}`, { method: "DELETE" });
+}
