@@ -69,10 +69,10 @@ npx tsc --noEmit   # type check
 
 Layered Spring Boot app under `com.joaolucas.finance_tracker`:
 
-- **controller/** — REST endpoints (`AuthController`, `TransactionController`, `CategoryController`)
+- **controller/** — REST endpoints (`AuthController`, `TransactionController`, `CategoryController`, `ProfileController`)
 - **service/** — business logic; receives DTOs, operates on entities
 - **repository/** — JPA repositories (Spring Data)
-- **entity/** — JPA entities (`User`, `Transaction`, `Category`, `TransactionType` enum)
+- **entity/** — JPA entities (`User`, `UserProfile`, `Transaction`, `Category`, `TransactionType` enum)
 - **dto/** — request/response objects with Bean Validation annotations
 - **mapper/** — entity ↔ DTO conversion (manual, no MapStruct)
 - **security/** — `JwtService` (JJWT), `JwtFilter` (extracts userId from token), `SecurityConfiguration`
@@ -86,6 +86,8 @@ Layered Spring Boot app under `com.joaolucas.finance_tracker`:
 
 **JWT expiry:** 15 minutes (hardcoded in `JwtService`). The frontend does not handle token refresh.
 
+**User profile:** `UserProfile` is a separate entity/table (`user_profile`) with a `@OneToOne` lazy relation to `User`. It is created on the first update (upsert in `ProfileService`). Photo is stored as `BYTEA` alongside its MIME type (`photo_type`) and returned as base64 in `ProfileResponseDTO` — the frontend constructs a `data:` URL from both fields. The `uploadPhoto` endpoint accepts `multipart/form-data` (not JSON), so it cannot go through `apiFetch`; it uses raw `fetch` with a manual `Authorization` header.
+
 ## Frontend architecture
 
 Next.js 16 App Router with two route groups:
@@ -93,8 +95,15 @@ Next.js 16 App Router with two route groups:
 - `(auth)/` — login and register pages, wrapped by `AuthLayout`
 - `(dashboard)/` — protected pages; `layout.tsx` checks for `token` in `localStorage` and redirects to `/login` if absent
 
-**Data fetching pattern:** custom hooks (`useTransactions`, `useCategories`) call service functions which use `apiFetch` from `services/api.ts`. `apiFetch` is the single place that attaches the `Authorization: Bearer <token>` header. Any new API call should go through it, not raw `fetch`.
+**Dashboard routes:**
+- `/transactions` — main page; transaction list with summary cards and create modal
+- `/profile` — secondary profile fields (nickname, birth date, monthly income, marital status, photo upload)
+- `/preferences` — placeholder, not yet implemented
+
+**Data fetching pattern:** custom hooks (`useTransactions`, `useCategories`, `useProfile`) call service functions which use `apiFetch` from `services/api.ts`. `apiFetch` is the single place that attaches the `Authorization: Bearer <token>` header. Any new API call should go through it, not raw `fetch` — except multipart uploads, which must set the `Authorization` header manually and omit `Content-Type` so the browser can set the multipart boundary.
 
 **Token storage:** JWT is stored in `localStorage` under the key `"token"`. The `useAuth` hook and `lib/auth.ts` handle login/logout.
 
 **Styling:** Tailwind CSS v4 with `@tailwindcss/postcss`. CSS custom properties defined in `app/globals.css` (`:root`) drive the color system — graphite dark theme with turquoise accent. Use `var(--color-*)` in arbitrary Tailwind values (e.g. `bg-[var(--color-surface)]`).
+
+**Date handling:** always use local-timezone methods (`getFullYear()`, `getMonth()`, `getDate()`) when formatting dates for `<input type="date">` — never `toISOString()`, which returns UTC and shifts the date for users in negative UTC offsets.
