@@ -72,7 +72,7 @@ Layered Spring Boot app under `com.joaolucas.finance_tracker`:
 - **controller/** — REST endpoints (`AuthController`, `TransactionController`, `CategoryController`, `ProfileController`)
 - **service/** — business logic; receives DTOs, operates on entities
 - **repository/** — JPA repositories (Spring Data)
-- **entity/** — JPA entities (`User`, `UserProfile`, `Transaction`, `Category`, `TransactionType` enum)
+- **entity/** — JPA entities (`User`, `UserProfile`, `RefreshToken`, `Transaction`, `Category`, `TransactionType` enum)
 - **dto/** — request/response objects with Bean Validation annotations
 - **mapper/** — entity ↔ DTO conversion (manual, no MapStruct)
 - **security/** — `JwtService` (JJWT), `JwtFilter` (extracts userId from token), `SecurityConfiguration`
@@ -84,7 +84,7 @@ Layered Spring Boot app under `com.joaolucas.finance_tracker`:
 
 **Category constraint:** enforced at DB level — `is_default=true` requires `user_id IS NULL`; `is_default=false` requires `user_id IS NOT NULL`. This check lives in `V2__create_category_table.sql`.
 
-**JWT expiry:** 15 minutes (hardcoded in `JwtService`). The frontend does not handle token refresh.
+**JWT expiry:** 15 minutes (hardcoded in `JwtService`). Refresh tokens expire in 7 days and are stored in the `refresh_token` table (one per user — generating a new one revokes the previous). Every use rotates the token. `POST /auth/refresh` is public; `POST /auth/logout` requires auth and revokes the stored token.
 
 **User profile:** `UserProfile` is a separate entity/table (`user_profile`) with a `@OneToOne` lazy relation to `User`. It is created on the first update (upsert in `ProfileService`). Photo is stored as `BYTEA` alongside its MIME type (`photo_type`) and returned as base64 in `ProfileResponseDTO` — the frontend constructs a `data:` URL from both fields. The `uploadPhoto` endpoint accepts `multipart/form-data` (not JSON), so it cannot go through `apiFetch`; it uses raw `fetch` with a manual `Authorization` header.
 
@@ -102,7 +102,9 @@ Next.js 16 App Router with two route groups:
 
 **Data fetching pattern:** custom hooks (`useTransactions`, `useCategories`, `useProfile`) call service functions which use `apiFetch` from `services/api.ts`. `apiFetch` is the single place that attaches the `Authorization: Bearer <token>` header. Any new API call should go through it, not raw `fetch` — except multipart uploads, which must set the `Authorization` header manually and omit `Content-Type` so the browser can set the multipart boundary.
 
-**Token storage:** JWT is stored in `localStorage` under the key `"token"`. The `useAuth` hook and `lib/auth.ts` handle login/logout.
+**Token storage:** access token in `localStorage["token"]`, refresh token in `localStorage["refreshToken"]`. `useAuth.login` persists both; `logout` calls `POST /auth/logout` then clears both. `apiFetch` intercepts 401 responses, attempts a silent refresh via `tryRefreshToken` (concurrent requests share a single in-flight promise to avoid races), retries the original request once, and redirects to `/login` if the refresh also fails.
+
+**Profile state:** `ProfileContext` (in `src/context/ProfileContext.tsx`) wraps the dashboard layout and holds a single shared profile instance. `useProfile` is a thin wrapper around this context — do not call `getProfile()` directly in components; use `useProfile()` so the Header and profile page stay in sync.
 
 **Styling:** Tailwind CSS v4 with `@tailwindcss/postcss`. CSS custom properties defined in `app/globals.css` (`:root`) drive the color system — graphite dark theme with turquoise accent. Use `var(--color-*)` in arbitrary Tailwind values (e.g. `bg-[var(--color-surface)]`).
 
