@@ -29,10 +29,11 @@ export default function ProfilePage() {
     maritalStatus: "",
   });
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const photoSrc = getPhotoSrc(profile);
+  const savedPhotoSrc = getPhotoSrc(profile);
+  const displayPhotoSrc = previewUrl ?? savedPhotoSrc;
 
   useEffect(() => {
     if (!profile) return;
@@ -44,33 +45,46 @@ export default function ProfilePage() {
     });
   }, [profile]);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPendingPhoto(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    e.target.value = "";
+  }
+
+  function handleCancel() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPendingPhoto(null);
+    setPreviewUrl(null);
+    router.push("/transactions");
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
+      if (pendingPhoto) {
+        const withPhoto = await uploadPhoto(pendingPhoto);
+        setProfile(withPhoto);
+      }
       const updated = await updateProfile(form);
       setProfile(updated);
       router.push("/transactions");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingPhoto(true);
-    try {
-      const updated = await uploadPhoto(file);
-      setProfile(updated);
-    } finally {
-      setUploadingPhoto(false);
-      e.target.value = "";
     }
   }
 
@@ -90,8 +104,8 @@ export default function ProfilePage() {
       <div className="flex items-center gap-6">
         <div className="relative group flex-shrink-0">
           <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center bg-[var(--color-raised)] border border-[var(--color-border)]">
-            {photoSrc ? (
-              <img src={photoSrc} alt="Foto de perfil" className="w-full h-full object-cover" />
+            {displayPhotoSrc ? (
+              <img src={displayPhotoSrc} alt="Foto de perfil" className="w-full h-full object-cover" />
             ) : (
               <span className="text-2xl font-semibold text-[var(--color-secondary)]">
                 {profile?.name ? getInitials(profile.name) : "—"}
@@ -99,27 +113,21 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Hover overlay com lápis */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingPhoto}
-            className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-wait"
+            className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
             aria-label="Alterar foto de perfil"
           >
-            {uploadingPhoto ? (
-              <span className="text-white text-xs">...</span>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path
-                  d="M12.5 2.5a1.5 1.5 0 0 1 2.121 0l.879.879a1.5 1.5 0 0 1 0 2.121L6 15H3v-3L12.5 2.5Z"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path
+                d="M12.5 2.5a1.5 1.5 0 0 1 2.121 0l.879.879a1.5 1.5 0 0 1 0 2.121L6 15H3v-3L12.5 2.5Z"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
 
           <input
@@ -127,13 +135,16 @@ export default function ProfilePage() {
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={handlePhotoChange}
+            onChange={handlePhotoSelect}
           />
         </div>
 
         <div>
           <p className="text-[var(--color-text)] font-semibold text-lg">{profile?.name}</p>
           <p className="text-[var(--color-muted)] text-sm">{profile?.email}</p>
+          {pendingPhoto && (
+            <p className="text-[var(--color-teal)] text-xs mt-1">Nova foto selecionada — salve para confirmar.</p>
+          )}
         </div>
       </div>
 
@@ -208,7 +219,7 @@ export default function ProfilePage() {
         <div className="flex items-center justify-end gap-3 pt-2">
           <button
             type="button"
-            onClick={() => router.push("/transactions")}
+            onClick={handleCancel}
             className="px-6 py-2.5 rounded-lg border border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-muted)] text-sm font-medium transition-colors cursor-pointer"
           >
             Cancelar
