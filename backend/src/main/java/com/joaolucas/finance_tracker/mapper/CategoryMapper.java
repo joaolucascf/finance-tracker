@@ -27,6 +27,7 @@ public class CategoryMapper {
         return Category.builder()
                 .name(dto.getName())
                 .user(user)
+                .defaultCategory(false)
                 .build();
     }
 }
