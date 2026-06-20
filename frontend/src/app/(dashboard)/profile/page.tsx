@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useProfile } from "@/hooks/useProfile";
 import { updateProfile, uploadPhoto } from "@/services/profile";
 import { ProfileFormState, MARITAL_STATUS_OPTIONS, getPhotoSrc } from "@/types/profile";
+import { Select } from "@/components/ui/Select";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 const inputClass =
   "w-full bg-[var(--color-raised)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-text)] text-sm placeholder:text-[var(--color-muted)] focus:outline-none focus:border-[var(--color-teal)] transition-colors disabled:opacity-50";
@@ -25,7 +27,7 @@ export default function ProfilePage() {
   const [form, setForm] = useState<ProfileFormState>({
     nickname: "",
     birthDate: "",
-    monthlyIncome: "",
+    monthlyIncome: 0,
     maritalStatus: "",
   });
   const [saving, setSaving] = useState(false);
@@ -40,7 +42,7 @@ export default function ProfilePage() {
     setForm({
       nickname: profile.nickname ?? "",
       birthDate: profile.birthDate ?? "",
-      monthlyIncome: profile.monthlyIncome?.toString() ?? "",
+      monthlyIncome: profile.monthlyIncome ?? 0,
       maritalStatus: profile.maritalStatus ?? "",
     });
   }, [profile]);
@@ -51,7 +53,7 @@ export default function ProfilePage() {
     };
   }, [previewUrl]);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
@@ -184,14 +186,11 @@ export default function ProfilePage() {
             <label className="block text-xs text-[var(--color-secondary)] font-medium uppercase tracking-wide">
               Renda Mensal (R$)
             </label>
-            <input
+            <MoneyInput
               name="monthlyIncome"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0,00"
               value={form.monthlyIncome}
-              onChange={handleChange}
+              onChange={(v) => setForm((prev) => ({ ...prev, monthlyIncome: v }))}
+              disabled={saving}
               className={inputClass}
             />
           </div>
@@ -200,19 +199,18 @@ export default function ProfilePage() {
             <label className="block text-xs text-[var(--color-secondary)] font-medium uppercase tracking-wide">
               Estado Civil
             </label>
-            <select
-              name="maritalStatus"
-              value={form.maritalStatus}
-              onChange={handleChange}
-              className={inputClass + " cursor-pointer"}
-            >
-              <option value="">Não informado</option>
-              {MARITAL_STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <Select
+              value={form.maritalStatus || null}
+              onChange={(val) =>
+                setForm((prev) => ({ ...prev, maritalStatus: (val as string) ?? "" }))
+              }
+              options={MARITAL_STATUS_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: opt.label,
+              }))}
+              placeholder="Não informado"
+              disabled={saving}
+            />
           </div>
         </div>
 

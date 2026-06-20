@@ -6,6 +6,7 @@ import { CategorySelect } from "../../categories/CategorySelect";
 import { useCategories } from "@/hooks/useCategories";
 import { FormState } from "@/types/transactions";
 import { ApiError } from "@/types/api-error";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type Props = {
   onSuccess: () => void;
@@ -14,7 +15,7 @@ type Props = {
 
 const getInitialState = (): FormState => ({
   description: "",
-  amount: "",
+  amount: 0,
   type: "EXPENSE",
   categoryId: null,
   date: (() => {
@@ -27,7 +28,7 @@ const inputClass =
   "w-full bg-[var(--color-raised)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-text)] text-sm placeholder:text-[var(--color-muted)] focus:outline-none focus:border-[var(--color-teal)] transition-colors disabled:opacity-50";
 
 export default function TransactionForm({ onSuccess, disabled }: Props) {
-  const { categories, loading } = useCategories();
+  const { categories, loading, reload: reloadCategories } = useCategories();
   const [form, setForm] = useState<FormState>(getInitialState);
   const [error, setError] = useState<ApiError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,10 +52,7 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
       if (!prev?.fields) return prev;
       return { ...prev, fields: prev.fields.filter((f) => f.field !== name) };
     });
-    setForm((prev) => ({
-      ...prev,
-      [name]: name === "amount" ? (value === "" ? "" : Number(value)) : value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   }
 
   function handleCategoryChange(value: number | null) {
@@ -76,7 +74,7 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
     try {
       setIsSubmitting(true);
       setError(null);
-      await createTransaction({ ...form, amount: Number(form.amount) });
+      await createTransaction(form);
       onSuccess();
       setForm(getInitialState());
     } catch (err) {
@@ -154,14 +152,16 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
         <label className="block text-xs text-[var(--color-secondary)] font-medium uppercase tracking-wide">
           Valor (R$)
         </label>
-        <input
+        <MoneyInput
           name="amount"
-          type="number"
-          placeholder="0,00"
-          min="0"
-          step="0.01"
           value={form.amount}
-          onChange={handleChange}
+          onChange={(v) => {
+            setError((prev) => {
+              if (!prev?.fields) return prev;
+              return { ...prev, fields: prev.fields.filter((f) => f.field !== "amount") };
+            });
+            setForm((prev) => ({ ...prev, amount: v }));
+          }}
           disabled={isDisabled}
           className={inputClass}
         />
@@ -181,6 +181,7 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
           value={form.categoryId}
           onChange={handleCategoryChange}
           categories={categories}
+          onCategoryCreated={reloadCategories}
           disabled={isDisabled}
         />
       </div>

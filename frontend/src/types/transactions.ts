@@ -12,7 +12,7 @@ export type Transaction = {
 
 export type FormState = {
   description: string;
-  amount: number | "";
+  amount: number;
   type: "EXPENSE" | "INCOME";
   categoryId: number | null;
   date: string;

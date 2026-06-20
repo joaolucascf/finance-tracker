@@ -13,7 +13,7 @@ export async function updateProfile(data: ProfileFormState): Promise<Profile> {
     body: JSON.stringify({
       nickname: data.nickname || null,
       birthDate: data.birthDate || null,
-      monthlyIncome: data.monthlyIncome ? Number(data.monthlyIncome) : null,
+      monthlyIncome: data.monthlyIncome || null,
       maritalStatus: data.maritalStatus || null,
     }),
   });

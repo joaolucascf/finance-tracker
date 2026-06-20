@@ -12,7 +12,7 @@ export type Profile = {
 export type ProfileFormState = {
   nickname: string;
   birthDate: string;
-  monthlyIncome: string;
+  monthlyIncome: number;
   maritalStatus: string;
 };
 
