@@ -8,6 +8,7 @@ export type Transaction = {
     id: number;
     name: string;
   };
+  imported: boolean;
 };
 
 export type FormState = {

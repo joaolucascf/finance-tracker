@@ -34,16 +34,32 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-5 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-      <Link href="/transactions" className="flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-lg bg-[var(--color-teal)] flex items-center justify-center">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 10L7 4L12 10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <span className="text-[var(--color-text)] font-semibold text-base tracking-tight">
-          Finance
-        </span>
-      </Link>
+      <div className="flex items-center gap-6">
+        <Link href="/transactions" className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-[var(--color-teal)] flex items-center justify-center">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 10L7 4L12 10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <span className="text-[var(--color-text)] font-semibold text-base tracking-tight">
+            Finance
+          </span>
+        </Link>
+        <nav className="flex items-center gap-4">
+          <Link
+            href="/transactions"
+            className="text-sm text-[var(--color-secondary)] hover:text-[var(--color-text)] transition-colors"
+          >
+            Transações
+          </Link>
+          <Link
+            href="/open-finance"
+            className="text-sm text-[var(--color-secondary)] hover:text-[var(--color-text)] transition-colors"
+          >
+            Open Finance
+          </Link>
+        </nav>
+      </div>
 
       <div className="flex items-center gap-3">
         <FriendsMenu />

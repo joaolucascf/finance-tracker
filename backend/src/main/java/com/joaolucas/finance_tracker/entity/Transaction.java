@@ -41,4 +41,11 @@ public class Transaction {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
+
+    @Column(nullable = false)
+    private boolean imported;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_account_id")
+    private FinancialAccount sourceAccount;
 }

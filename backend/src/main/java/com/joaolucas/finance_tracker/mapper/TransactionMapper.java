@@ -29,6 +29,7 @@ public class TransactionMapper {
                 .description(transaction.getDescription())
                 .date(transaction.getDate())
                 .category(categoryMapper.toDTO(transaction.getCategory()))
+                .imported(transaction.isImported())
                 .build();
     }
 

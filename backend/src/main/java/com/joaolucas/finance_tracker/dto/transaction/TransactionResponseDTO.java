@@ -25,4 +25,5 @@ public class TransactionResponseDTO {
     private String description;
     private LocalDate date;
     private CategoryResponseDTO category;
+    private boolean imported;
 }
