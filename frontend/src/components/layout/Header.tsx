@@ -5,6 +5,7 @@ import Link from "next/link";
 import { logout } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 import { getPhotoSrc } from "@/types/profile";
+import FriendsMenu from "@/components/layout/FriendsMenu";
 
 function getInitials(name: string) {
   return name
@@ -44,7 +45,10 @@ export default function Header() {
         </span>
       </Link>
 
-      <div className="relative" ref={dropdownRef}>
+      <div className="flex items-center gap-3">
+        <FriendsMenu />
+
+        <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setOpen((prev) => !prev)}
           className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center bg-[var(--color-raised)] border border-[var(--color-border)] hover:border-[var(--color-teal)] transition-colors cursor-pointer"
@@ -93,6 +97,7 @@ export default function Header() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </header>
   );

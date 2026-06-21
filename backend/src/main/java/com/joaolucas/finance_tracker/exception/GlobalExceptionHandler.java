@@ -41,6 +41,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(error.getStatus()).body(error);
     }
 
+    @ExceptionHandler (ConflictException.class)
+    @ResponseStatus (HttpStatus.CONFLICT)
+    public ResponseEntity<ApiError> handleConflict(ConflictException exception, HttpServletRequest request) {
+        ApiError error = ApiErrorFactory.build(HttpStatus.CONFLICT, request, exception);
+
+        return ResponseEntity.status(error.getStatus()).body(error);
+    }
+
     @ExceptionHandler (MethodArgumentNotValidException.class)
     @ResponseStatus (HttpStatus.BAD_REQUEST)
     public ResponseEntity<ApiError> handleValidationErrors(MethodArgumentNotValidException exception,
@@ -61,7 +69,7 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .status(status.value())
                 .error(status.getReasonPhrase())
-                .message(exception.getMessage())
+                .message("Dados inválidos. Verifique os campos informados.")
                 .path(request.getRequestURI())
                 .errors(fieldErrors)
                 .build();
