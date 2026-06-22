@@ -2,6 +2,7 @@ package com.joaolucas.finance_tracker.service;
 
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,7 @@ import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
 import com.joaolucas.finance_tracker.entity.Category;
 import com.joaolucas.finance_tracker.entity.Transaction;
 import com.joaolucas.finance_tracker.entity.User;
+import com.joaolucas.finance_tracker.exception.ConflictException;
 import com.joaolucas.finance_tracker.exception.ForbiddenException;
 import com.joaolucas.finance_tracker.exception.NotFoundException;
 import com.joaolucas.finance_tracker.mapper.TransactionMapper;
@@ -52,6 +54,46 @@ public class TransactionService {
                 .stream()
                 .map(transactionMapper::toDTO)
                 .toList();
+    }
+
+    public TransactionResponseDTO update(Long id, TransactionRequestDTO requestDTO) {
+        User authenticatedUser = this.authService.getAuthenticatedUser();
+
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Transação não encontrada"));
+        if (!transaction.getUser().getId().equals(authenticatedUser.getId())) {
+            throw new ForbiddenException("Acesso negado");
+        }
+
+        if (transaction.isImported()) {
+            ensureOnlyDescriptionChanged(transaction, requestDTO);
+            transaction.setDescription(requestDTO.getDescription());
+        } else {
+            Category category = this.categoryService.getIfAvailableForUser(requestDTO.getCategoryId(),
+                    authenticatedUser.getId());
+            transaction.setAmount(requestDTO.getAmount());
+            transaction.setType(requestDTO.getType());
+            transaction.setDescription(requestDTO.getDescription());
+            transaction.setDate(requestDTO.getDate());
+            transaction.setCategory(category);
+        }
+
+        Transaction saved = this.transactionRepository.save(transaction);
+        return transactionMapper.toDTO(saved);
+    }
+
+    private void ensureOnlyDescriptionChanged(Transaction transaction, TransactionRequestDTO requestDTO) {
+        Long currentCategoryId = transaction.getCategory() != null ? transaction.getCategory().getId() : null;
+
+        boolean amountChanged = requestDTO.getAmount() == null
+                || transaction.getAmount().compareTo(requestDTO.getAmount()) != 0;
+        boolean typeChanged = transaction.getType() != requestDTO.getType();
+        boolean dateChanged = !transaction.getDate().equals(requestDTO.getDate());
+        boolean categoryChanged = !Objects.equals(currentCategoryId, requestDTO.getCategoryId());
+
+        if (amountChanged || typeChanged || dateChanged || categoryChanged) {
+            throw new ConflictException("Transações importadas só permitem editar a descrição");
+        }
     }
 
     public void delete(Long id) {

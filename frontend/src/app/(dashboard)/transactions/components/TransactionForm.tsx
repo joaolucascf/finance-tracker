@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createTransaction } from "@/services/transactions";
+import {
+  createTransaction,
+  updateTransaction,
+} from "@/services/transactions";
 import { CategorySelect } from "../../categories/CategorySelect";
 import { useCategories } from "@/hooks/useCategories";
 import { FormState } from "@/types/transactions";
@@ -11,6 +14,13 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 type Props = {
   onSuccess: () => void;
   disabled?: boolean;
+  /** When provided, the form edits this transaction instead of creating one. */
+  transactionId?: number;
+  initialValues?: FormState;
+  /** Imported transactions only allow editing the description. */
+  imported?: boolean;
+  /** Called on submit failure; when set, generic errors are delegated here instead of rendered inline. */
+  onError?: (error: ApiError) => void;
 };
 
 const getInitialState = (): FormState => ({
@@ -27,11 +37,22 @@ const getInitialState = (): FormState => ({
 const inputClass =
   "w-full bg-[var(--color-raised)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-text)] text-sm placeholder:text-[var(--color-muted)] focus:outline-none focus:border-[var(--color-teal)] transition-colors disabled:opacity-50";
 
-export default function TransactionForm({ onSuccess, disabled }: Props) {
+export default function TransactionForm({
+  onSuccess,
+  disabled,
+  transactionId,
+  initialValues,
+  imported = false,
+  onError,
+}: Props) {
   const { categories, loading, reload: reloadCategories } = useCategories();
-  const [form, setForm] = useState<FormState>(getInitialState);
+  const [form, setForm] = useState<FormState>(
+    () => initialValues ?? getInitialState(),
+  );
   const [error, setError] = useState<ApiError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isEditing = transactionId != null;
 
   const fieldErrors = useMemo(() => {
     if (!error?.fields) return {};
@@ -43,6 +64,8 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
   }, [error]);
 
   const isDisabled = disabled || loading || isSubmitting;
+  // Imported transactions lock every field except the description.
+  const lockedFields = imported;
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -74,12 +97,21 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
     try {
       setIsSubmitting(true);
       setError(null);
-      await createTransaction(form);
+      if (isEditing) {
+        await updateTransaction(transactionId, form);
+      } else {
+        await createTransaction(form);
+      }
       onSuccess();
-      setForm(getInitialState());
+      if (!isEditing) setForm(getInitialState());
     } catch (err) {
-      if (isApiError(err)) setError(err);
-      else console.error("Erro inesperado: ", err);
+      if (isApiError(err)) {
+        // Field-level errors stay inline; generic errors can be delegated (e.g. a toast).
+        if (err.fields || !onError) setError(err);
+        else onError(err);
+      } else {
+        console.error("Erro inesperado: ", err);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -88,16 +120,22 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <h2 className="text-[var(--color-text)] text-lg font-semibold mb-2">
-        Nova Transação
+        {isEditing ? "Editar Transação" : "Nova Transação"}
       </h2>
+
+      {lockedFields && (
+        <p className="text-[var(--color-muted)] text-xs">
+          Transação importada — apenas a descrição pode ser editada.
+        </p>
+      )}
 
       {/* Type toggle */}
       <div className="flex rounded-lg overflow-hidden border border-[var(--color-border)] text-sm font-medium">
         <button
           type="button"
-          disabled={isDisabled}
+          disabled={isDisabled || lockedFields}
           onClick={() => setForm((prev) => ({ ...prev, type: "EXPENSE" }))}
-          className="flex-1 py-2.5 transition-colors cursor-pointer disabled:cursor-not-allowed"
+          className="flex-1 py-2.5 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             backgroundColor:
               form.type === "EXPENSE"
@@ -111,9 +149,9 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
         </button>
         <button
           type="button"
-          disabled={isDisabled}
+          disabled={isDisabled || lockedFields}
           onClick={() => setForm((prev) => ({ ...prev, type: "INCOME" }))}
-          className="flex-1 py-2.5 transition-colors cursor-pointer disabled:cursor-not-allowed"
+          className="flex-1 py-2.5 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             backgroundColor:
               form.type === "INCOME"
@@ -162,7 +200,7 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
             });
             setForm((prev) => ({ ...prev, amount: v }));
           }}
-          disabled={isDisabled}
+          disabled={isDisabled || lockedFields}
           className={inputClass}
         />
         {fieldErrors.amount && (
@@ -182,7 +220,7 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
           onChange={handleCategoryChange}
           categories={categories}
           onCategoryCreated={reloadCategories}
-          disabled={isDisabled}
+          disabled={isDisabled || lockedFields}
         />
       </div>
 
@@ -196,7 +234,7 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
           type="date"
           value={form.date}
           onChange={handleChange}
-          disabled={isDisabled}
+          disabled={isDisabled || lockedFields}
           className={inputClass}
         />
         {fieldErrors.date && (
@@ -215,7 +253,11 @@ export default function TransactionForm({ onSuccess, disabled }: Props) {
         disabled={isDisabled}
         className="w-full py-3 rounded-lg bg-[var(--color-teal)] text-white font-semibold text-sm hover:bg-[var(--color-teal-dark)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer mt-2"
       >
-        {isSubmitting ? "Salvando..." : "Salvar transação"}
+        {isSubmitting
+          ? "Salvando..."
+          : isEditing
+            ? "Salvar alterações"
+            : "Salvar transação"}
       </button>
     </form>
   );

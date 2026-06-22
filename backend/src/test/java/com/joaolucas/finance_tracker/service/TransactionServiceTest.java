@@ -11,8 +11,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,8 +28,11 @@ import com.joaolucas.finance_tracker.dto.transaction.TransactionRequestDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
 import com.joaolucas.finance_tracker.entity.Category;
 import com.joaolucas.finance_tracker.entity.Transaction;
+import com.joaolucas.finance_tracker.entity.TransactionType;
 import com.joaolucas.finance_tracker.entity.User;
+import com.joaolucas.finance_tracker.exception.ConflictException;
 import com.joaolucas.finance_tracker.exception.ForbiddenException;
+import com.joaolucas.finance_tracker.exception.NotFoundException;
 import com.joaolucas.finance_tracker.mapper.TransactionMapper;
 import com.joaolucas.finance_tracker.repository.TransactionRepository;
 
@@ -198,6 +204,137 @@ class TransactionServiceTest {
         assertEquals("Usuário autenticado não encontrado", exception.getMessage());
         verify(transactionRepository, never()).findByUserId(anyLong());
         verify(transactionMapper, never()).toDTO(any());
+    }
+
+    // ===== UPDATE =====
+    @Test
+    void update$shouldUpdateAllFieldsWhenNotImported() {
+        // given
+        Transaction existing = Transaction.builder()
+                .id(5L).user(user).imported(false)
+                .amount(BigDecimal.TEN).type(TransactionType.EXPENSE)
+                .date(LocalDate.of(2026, 1, 1)).description("old")
+                .category(category).build();
+
+        Category newCategory = category(20L);
+
+        TransactionRequestDTO dto = new TransactionRequestDTO();
+        dto.setAmount(BigDecimal.valueOf(99));
+        dto.setType(TransactionType.INCOME);
+        dto.setDate(LocalDate.of(2026, 6, 10));
+        dto.setDescription("new");
+        dto.setCategoryId(20L);
+
+        when(authService.getAuthenticatedUser()).thenReturn(user);
+        when(transactionRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(categoryService.getIfAvailableForUser(20L, 1L)).thenReturn(newCategory);
+        when(transactionRepository.save(existing)).thenReturn(existing);
+        when(transactionMapper.toDTO(existing)).thenReturn(responseDTO);
+
+        // when
+        TransactionResponseDTO result = transactionService.update(5L, dto);
+
+        // then
+        assertEquals(responseDTO, result);
+        assertEquals(BigDecimal.valueOf(99), existing.getAmount());
+        assertEquals(TransactionType.INCOME, existing.getType());
+        assertEquals(LocalDate.of(2026, 6, 10), existing.getDate());
+        assertEquals("new", existing.getDescription());
+        assertEquals(newCategory, existing.getCategory());
+        verify(transactionRepository).save(existing);
+    }
+
+    @Test
+    void update$shouldUpdateOnlyDescriptionWhenImported() {
+        // given — every locked field matches the persisted value, only description differs
+        Transaction existing = Transaction.builder()
+                .id(5L).user(user).imported(true)
+                .amount(BigDecimal.TEN).type(TransactionType.EXPENSE)
+                .date(LocalDate.of(2026, 1, 1)).description("old")
+                .category(null).build();
+
+        TransactionRequestDTO dto = new TransactionRequestDTO();
+        dto.setAmount(BigDecimal.TEN);
+        dto.setType(TransactionType.EXPENSE);
+        dto.setDate(LocalDate.of(2026, 1, 1));
+        dto.setDescription("new description");
+        dto.setCategoryId(null);
+
+        when(authService.getAuthenticatedUser()).thenReturn(user);
+        when(transactionRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(transactionRepository.save(existing)).thenReturn(existing);
+        when(transactionMapper.toDTO(existing)).thenReturn(responseDTO);
+
+        // when
+        TransactionResponseDTO result = transactionService.update(5L, dto);
+
+        // then
+        assertEquals(responseDTO, result);
+        assertEquals("new description", existing.getDescription());
+        assertEquals(BigDecimal.TEN, existing.getAmount());
+        verify(categoryService, never()).getIfAvailableForUser(any(), any());
+        verify(transactionRepository).save(existing);
+    }
+
+    @Test
+    void update$shouldThrowConflictWhenImportedAndLockedFieldChanged() {
+        // given
+        Transaction existing = Transaction.builder()
+                .id(5L).user(user).imported(true)
+                .amount(BigDecimal.TEN).type(TransactionType.EXPENSE)
+                .date(LocalDate.of(2026, 1, 1)).description("old")
+                .build();
+
+        TransactionRequestDTO dto = new TransactionRequestDTO();
+        dto.setAmount(BigDecimal.valueOf(50)); // changed
+        dto.setType(TransactionType.EXPENSE);
+        dto.setDate(LocalDate.of(2026, 1, 1));
+        dto.setDescription("new description");
+
+        when(authService.getAuthenticatedUser()).thenReturn(user);
+        when(transactionRepository.findById(5L)).thenReturn(Optional.of(existing));
+
+        // when + then
+        ConflictException exception = assertThrows(
+                ConflictException.class,
+                () -> transactionService.update(5L, dto)
+        );
+
+        assertEquals("Transações importadas só permitem editar a descrição", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void update$shouldThrowNotFoundWhenTransactionDoesNotExist() {
+        // given
+        when(authService.getAuthenticatedUser()).thenReturn(user);
+        when(transactionRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // when + then
+        assertThrows(
+                NotFoundException.class,
+                () -> transactionService.update(99L, new TransactionRequestDTO())
+        );
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void update$shouldThrowForbiddenWhenNotOwner() {
+        // given — transaction owned by user 2, authenticated user is 1
+        Transaction existing = Transaction.builder()
+                .id(5L).user(user(2L)).imported(false)
+                .amount(BigDecimal.TEN).type(TransactionType.EXPENSE)
+                .date(LocalDate.now()).build();
+
+        when(authService.getAuthenticatedUser()).thenReturn(user);
+        when(transactionRepository.findById(5L)).thenReturn(Optional.of(existing));
+
+        // when + then
+        assertThrows(
+                ForbiddenException.class,
+                () -> transactionService.update(5L, new TransactionRequestDTO())
+        );
+        verify(transactionRepository, never()).save(any());
     }
 
     // ===== UTILITY METHODS =====

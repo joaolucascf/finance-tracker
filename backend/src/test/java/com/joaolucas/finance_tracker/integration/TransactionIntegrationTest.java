@@ -4,6 +4,7 @@ package com.joaolucas.finance_tracker.integration;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -305,6 +306,132 @@ class TransactionIntegrationTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("Unauthorized"))
                     .andExpect(jsonPath("$.message").value("Token expirado"))
                     .andExpect(jsonPath("$.path").value("/transactions"));
+        }
+    }
+
+    @Nested
+    class UpdateTransaction {
+
+        @Test
+        void shouldUpdateAllFields_whenNotImported() throws Exception {
+            Transaction tx = transactionRepository.save(
+                    Transaction.builder()
+                            .amount(DEFAULT_AMOUNT)
+                            .type(TransactionType.EXPENSE)
+                            .date(today)
+                            .description("Original")
+                            .category(category)
+                            .user(user)
+                            .imported(false)
+                            .build());
+
+            TransactionRequestDTO request = new TransactionRequestDTO();
+            request.setAmount(BigDecimal.valueOf(100));
+            request.setType(TransactionType.INCOME);
+            request.setDate(today);
+            request.setDescription("Updated");
+            request.setCategoryId(category.getId());
+
+            mockMvc.perform(put("/transactions/" + tx.getId())
+                            .header("Authorization", bearerToken(user.getId()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.description").value("Updated"))
+                    .andExpect(jsonPath("$.amount").value(100))
+                    .andExpect(jsonPath("$.type").value("INCOME"));
+
+            Transaction persisted = transactionRepository.findById(tx.getId()).orElseThrow();
+            assertEquals("Updated", persisted.getDescription());
+            assertEquals(TransactionType.INCOME, persisted.getType());
+        }
+
+        @Test
+        void shouldUpdateOnlyDescription_whenImported() throws Exception {
+            Transaction tx = transactionRepository.save(
+                    Transaction.builder()
+                            .amount(DEFAULT_AMOUNT)
+                            .type(TransactionType.EXPENSE)
+                            .date(today)
+                            .description("Imported")
+                            .user(user)
+                            .imported(true)
+                            .build());
+
+            TransactionRequestDTO request = new TransactionRequestDTO();
+            request.setAmount(DEFAULT_AMOUNT); // unchanged
+            request.setType(TransactionType.EXPENSE);
+            request.setDate(today);
+            request.setDescription("Renamed");
+
+            mockMvc.perform(put("/transactions/" + tx.getId())
+                            .header("Authorization", bearerToken(user.getId()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.description").value("Renamed"));
+        }
+
+        @Test
+        void shouldReturn409_whenImportedAndLockedFieldChanged() throws Exception {
+            Transaction tx = transactionRepository.save(
+                    Transaction.builder()
+                            .amount(DEFAULT_AMOUNT)
+                            .type(TransactionType.EXPENSE)
+                            .date(today)
+                            .description("Imported")
+                            .user(user)
+                            .imported(true)
+                            .build());
+
+            TransactionRequestDTO request = new TransactionRequestDTO();
+            request.setAmount(BigDecimal.valueOf(999)); // changed
+            request.setType(TransactionType.EXPENSE);
+            request.setDate(today);
+            request.setDescription("New name");
+
+            mockMvc.perform(put("/transactions/" + tx.getId())
+                            .header("Authorization", bearerToken(user.getId()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message")
+                            .value("Transações importadas só permitem editar a descrição"));
+        }
+
+        @Test
+        void shouldReturn404_whenTransactionDoesNotExist() throws Exception {
+            TransactionRequestDTO request = createValidTransactionRequest(category.getId());
+
+            mockMvc.perform(put("/transactions/9999")
+                            .header("Authorization", bearerToken(user.getId()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.message").value("Transação não encontrada"));
+        }
+
+        @Test
+        void shouldReturn403_whenTransactionBelongsToAnotherUser() throws Exception {
+            User otherUser = createUser("Mary", "mary@email.com");
+            Transaction tx = transactionRepository.save(
+                    Transaction.builder()
+                            .amount(DEFAULT_AMOUNT)
+                            .type(TransactionType.EXPENSE)
+                            .date(today)
+                            .description("Other user tx")
+                            .user(otherUser)
+                            .imported(false)
+                            .build());
+
+            TransactionRequestDTO request = createValidTransactionRequest(category.getId());
+
+            mockMvc.perform(put("/transactions/" + tx.getId())
+                            .header("Authorization", bearerToken(user.getId()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.message").value("Acesso negado"));
         }
     }
 

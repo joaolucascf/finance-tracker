@@ -4,7 +4,8 @@ import { useState } from "react";
 import TransactionForm from "./components/TransactionForm";
 import { useTransactions } from "@/hooks/useTransactions";
 import { Modal } from "@/components/ui/Modal";
-import { Transaction } from "@/types/transactions";
+import { Toast } from "@/components/ui/Toast";
+import { FormState, Transaction } from "@/types/transactions";
 import { deleteTransaction } from "@/services/transactions";
 
 function formatCurrency(value: number) {
@@ -21,11 +22,23 @@ function formatDate(dateStr: string) {
   }).format(new Date(dateStr + "T00:00:00"));
 }
 
+function toFormState(t: Transaction): FormState {
+  return {
+    description: t.description ?? "",
+    amount: t.amount,
+    type: t.type,
+    categoryId: t.category ? t.category.id : null,
+    date: t.date,
+  };
+}
+
 export default function TransactionsPage() {
   const { transactions, loading, error, reload } = useTransactions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   async function handleConfirmDelete() {
     if (!transactionToDelete) return;
@@ -152,6 +165,7 @@ export default function TransactionsPage() {
               key={t.id}
               transaction={t}
               last={i === transactions.length - 1}
+              onEdit={() => setTransactionToEdit(t)}
               onDelete={() => setTransactionToDelete(t)}
             />
           ))}
@@ -168,6 +182,27 @@ export default function TransactionsPage() {
             reload();
           }}
         />
+      </Modal>
+
+      <Modal
+        isOpen={!!transactionToEdit}
+        onClose={() => setTransactionToEdit(null)}
+      >
+        {transactionToEdit && (
+          <TransactionForm
+            transactionId={transactionToEdit.id}
+            initialValues={toFormState(transactionToEdit)}
+            imported={transactionToEdit.imported}
+            onSuccess={() => {
+              setTransactionToEdit(null);
+              reload();
+            }}
+            onError={(err) => {
+              setTransactionToEdit(null);
+              setToast(err.message);
+            }}
+          />
+        )}
       </Modal>
 
       <Modal
@@ -206,6 +241,8 @@ export default function TransactionsPage() {
           </div>
         </div>
       </Modal>
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -213,10 +250,12 @@ export default function TransactionsPage() {
 function TransactionItem({
   transaction: t,
   last,
+  onEdit,
   onDelete,
 }: {
   transaction: Transaction;
   last: boolean;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const isIncome = t.type === "INCOME";
@@ -254,8 +293,18 @@ function TransactionItem({
         {formatDate(t.date)}
       </span>
 
-      {/* Amount + delete */}
-      <div className="flex items-center gap-2 flex-shrink-0 w-28 justify-end">
+      {/* Amount + actions */}
+      <div className="flex items-center gap-2 flex-shrink-0 w-32 justify-end">
+        <button
+          onClick={onEdit}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-teal)] hover:bg-[var(--color-border)] cursor-pointer"
+          aria-label="Editar transação"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
+        </button>
         <button
           onClick={onDelete}
           className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-expense)] hover:bg-[var(--color-border)] cursor-pointer"
