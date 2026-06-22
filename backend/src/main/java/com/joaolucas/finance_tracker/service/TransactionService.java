@@ -1,6 +1,8 @@
 package com.joaolucas.finance_tracker.service;
 
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Objects;
 
@@ -48,9 +50,14 @@ public class TransactionService {
         return transactionMapper.toDTO(saved);
     }
 
-    public List<TransactionResponseDTO> getByAuthenticatedUser() {
-        User authenticadedUser = this.authService.getAuthenticatedUser();
-        return transactionRepository.findByUserId(authenticadedUser.getId())
+    public List<TransactionResponseDTO> getByAuthenticatedUser(Integer year, Integer month) {
+        User authenticatedUser = this.authService.getAuthenticatedUser();
+
+        YearMonth period = resolvePeriod(year, month);
+        LocalDate start = period.atDay(1);
+        LocalDate end = period.atEndOfMonth();
+
+        return transactionRepository.findByUserIdAndDateBetweenOrderByDateDescIdAsc(authenticatedUser.getId(), start, end)
                 .stream()
                 .map(transactionMapper::toDTO)
                 .toList();
@@ -94,6 +101,13 @@ public class TransactionService {
         if (amountChanged || typeChanged || dateChanged || categoryChanged) {
             throw new ConflictException("Transações importadas só permitem editar a descrição");
         }
+    }
+
+    private YearMonth resolvePeriod(Integer year, Integer month) {
+        YearMonth current = YearMonth.now();
+        int resolvedYear = year != null ? year : current.getYear();
+        int resolvedMonth = month != null ? month : current.getMonthValue();
+        return YearMonth.of(resolvedYear, resolvedMonth);
     }
 
     public void delete(Long id) {

@@ -283,6 +283,34 @@ class TransactionIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
+        void shouldReturnOnlyTransactionsWithinRequestedPeriod() throws Exception {
+            transactionRepository.saveAll(List.of(
+                    Transaction.builder()
+                            .amount(DEFAULT_AMOUNT)
+                            .type(TransactionType.EXPENSE)
+                            .date(LocalDate.of(2026, 6, 15))
+                            .description("June tx")
+                            .category(category)
+                            .user(user)
+                            .build(),
+                    Transaction.builder()
+                            .amount(DEFAULT_AMOUNT)
+                            .type(TransactionType.EXPENSE)
+                            .date(LocalDate.of(2026, 5, 31))
+                            .description("May tx")
+                            .category(category)
+                            .user(user)
+                            .build()
+            ));
+
+            mockMvc.perform(get("/transactions?year=2026&month=6")
+                            .header("Authorization", bearerToken(user.getId())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].description").value("June tx"));
+        }
+
+        @Test
         void shouldReturn401_whenInvalidToken() throws Exception {
             mockMvc.perform(get("/transactions")
                             .header("Authorization", "Bearer invalidToken"))

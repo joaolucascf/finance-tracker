@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -160,14 +161,14 @@ class TransactionServiceTest {
 
         List<Transaction> mockReturn = List.of(transaction);
 
-        when(transactionRepository.findByUserId(user.getId()))
+        when(transactionRepository.findByUserIdAndDateBetweenOrderByDateDescIdAsc(eq(user.getId()), any(), any()))
                 .thenReturn(mockReturn);
 
         when(transactionMapper.toDTO(transaction))
                 .thenReturn(dto);
 
         // when
-        List<TransactionResponseDTO> result = this.transactionService.getByAuthenticatedUser();
+        List<TransactionResponseDTO> result = this.transactionService.getByAuthenticatedUser(null, null);
 
         // then
         assertEquals(1, result.size());
@@ -180,10 +181,11 @@ class TransactionServiceTest {
         // given
         when(authService.getAuthenticatedUser()).thenReturn(user);
 
-        when(transactionRepository.findByUserId(user.getId())).thenReturn(Collections.emptyList());
+        when(transactionRepository.findByUserIdAndDateBetweenOrderByDateDescIdAsc(eq(user.getId()), any(), any()))
+                .thenReturn(Collections.emptyList());
 
         // when
-        List<TransactionResponseDTO> result = this.transactionService.getByAuthenticatedUser();
+        List<TransactionResponseDTO> result = this.transactionService.getByAuthenticatedUser(null, null);
 
         // then
         assertTrue(result.isEmpty());
@@ -198,11 +200,11 @@ class TransactionServiceTest {
         // when + then
         RuntimeException exception = assertThrows(
                 RuntimeException.class,
-                () -> transactionService.getByAuthenticatedUser()
+                () -> transactionService.getByAuthenticatedUser(null, null)
         );
 
         assertEquals("Usuário autenticado não encontrado", exception.getMessage());
-        verify(transactionRepository, never()).findByUserId(anyLong());
+        verify(transactionRepository, never()).findByUserIdAndDateBetweenOrderByDateDescIdAsc(anyLong(), any(), any());
         verify(transactionMapper, never()).toDTO(any());
     }
 

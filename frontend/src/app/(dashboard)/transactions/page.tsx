@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import TransactionForm from "./components/TransactionForm";
+import { PeriodSelector } from "./components/PeriodSelector";
 import { useTransactions } from "@/hooks/useTransactions";
 import { Modal } from "@/components/ui/Modal";
 import { Toast } from "@/components/ui/Toast";
@@ -16,10 +17,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(dateStr: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-  }).format(new Date(dateStr + "T00:00:00"));
+  return `Dia ${new Date(dateStr + "T00:00:00").getDate()}`;
 }
 
 function toFormState(t: Transaction): FormState {
@@ -33,7 +31,16 @@ function toFormState(t: Transaction): FormState {
 }
 
 export default function TransactionsPage() {
-  const { transactions, loading, error, reload } = useTransactions();
+  const now = new Date();
+  const [period, setPeriod] = useState({
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+  });
+
+  const { transactions, loading, error, reload } = useTransactions(
+    period.year,
+    period.month,
+  );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
@@ -67,13 +74,20 @@ export default function TransactionsPage() {
         <h1 className="text-[var(--color-text)] text-2xl font-bold tracking-tight">
           Transações
         </h1>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-1.5 bg-[var(--color-teal)] hover:bg-[var(--color-teal-dark)] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
-        >
-          <span className="text-base leading-none">+</span>
-          Nova transação
-        </button>
+        <div className="flex items-center gap-2">
+          <PeriodSelector
+            year={period.year}
+            month={period.month}
+            onChange={(year, month) => setPeriod({ year, month })}
+          />
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-1.5 bg-[var(--color-teal)] hover:bg-[var(--color-teal-dark)] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
+          >
+            <span className="text-base leading-none">+</span>
+            Nova transação
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -149,10 +163,10 @@ export default function TransactionsPage() {
             </svg>
           </div>
           <p className="text-[var(--color-secondary)] text-sm font-medium">
-            Nenhuma transação ainda
+            Nenhuma transação neste período
           </p>
           <p className="text-[var(--color-muted)] text-xs mt-1">
-            Clique em "Nova transação" para começar.
+            Clique em &quot;Nova transação&quot; para começar.
           </p>
         </div>
       )}

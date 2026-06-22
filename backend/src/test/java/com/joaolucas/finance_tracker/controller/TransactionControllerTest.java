@@ -114,18 +114,18 @@ class TransactionControllerTest {
 
     @Test
     void getAllFromAuthenticatedUser$shouldReturn200WithList() throws Exception {
-        when(transactionService.getByAuthenticatedUser())
+        when(transactionService.getByAuthenticatedUser(any(), any()))
                 .thenReturn(List.of(new TransactionResponseDTO()));
 
         mockMvc.perform(get("/transactions"))
                 .andExpect(status().isOk());
 
-        verify(transactionService).getByAuthenticatedUser();
+        verify(transactionService).getByAuthenticatedUser(any(), any());
     }
 
     @Test
     void getAllFromAuthenticatedUser$shouldReturn200WithEmptyList() throws Exception {
-        when(transactionService.getByAuthenticatedUser())
+        when(transactionService.getByAuthenticatedUser(any(), any()))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/transactions"))
