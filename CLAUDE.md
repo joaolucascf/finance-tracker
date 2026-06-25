@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Personal finance tracker with a Spring Boot backend and Next.js frontend backed by PostgreSQL.
 
+## Open threads / next steps
+
+The implemented code + this file are the source of truth. The items below are **new requirements or bug fixes still open** — not descriptions of current behavior:
+
+- **Card refunds/estornos** — card INCOME with null billId is currently all hidden (it's treated as a bill payment). A real estorno should instead *reduce* the open cycle. Deferred until there's real data; full decision notes in `requisito-estornos.txt`.
+- **Mock CRUD must be gated/removed before any real deploy** — `MockController` + `/mock` are dev-only and currently unguarded.
+- **Transition bill on a brand-new card has no `due_date`** (no closed bill to reference yet), so it won't show in the period filter until the first statement closes. Decide whether to estimate a placeholder due date.
+
 ## Running locally
 
 The easiest way to start everything (DB + backend + frontend) is:
@@ -152,7 +160,7 @@ The hard-won product insight: **Pluggy only returns a bill once the statement ha
 
 **Investments hiding (`PluggyCategory`):**
 - The provider category is captured verbatim into `transaction.provider_category` on import (it was previously discarded). The `PluggyCategory` enum is the single policy seam mapping the provider taxonomy to app behavior: today it flags which categories are hidden from the main ledger (`INVESTMENTS`, matched case-insensitively against a few label variants).
-- `findVisibleLedgerEntries` excludes rows whose `LOWER(provider_category)` is in `PluggyCategory.hiddenLedgerLabels()`. Kept as an enum (not a DB table) — it's a code-level policy, and storing the raw category future-proofs a dedicated investments view without a re-sync. **Caveat:** the exact Pluggy label for investments hasn't been verified against live data — adjust the enum if it differs.
+- `findVisibleLedgerEntries` excludes rows whose `LOWER(provider_category)` is in `PluggyCategory.hiddenLedgerLabels()`. Kept as an enum (not a DB table) — it's a code-level policy, and storing the raw category future-proofs a dedicated investments view without a re-sync. The label set has been confirmed against live Pluggy data.
 
 **Mock CRUD (dev-only, `MockController` + `/mock` frontend):**
 - `/{concept}` CRUD (`connections`, `accounts`, `bills`, `transactions`) to seed imported-style data without hitting Pluggy. User-scoped; auto-generates external ids. Relation fields are selects populated from existing DB rows. Bills can only be created for `CARTAO_CREDITO` accounts (`ConflictException` otherwise). **Should be gated/removed before any real deploy.**
