@@ -1,0 +1,41 @@
+REQUISITO PENDENTE — ESTORNOS EM FATURA DE CARTÃO
+(criado durante a implementação do modelo de faturas de transição)
+
+CONTEXTO
+--------
+Toda transação de cartão de crédito do tipo INCOME com billId nulo está, POR ENQUANTO,
+sendo simplesmente ESCONDIDA do extrato e IGNORADA no cálculo das faturas.
+
+Hoje sabemos que existe pelo menos um caso real de INCOME de cartão: o PAGAMENTO da
+fatura (ex.: INCOME de R$ 3.295,98 em 2026-06-08, exatamente o total_amount da fatura
+de vencimento 2026-06-09). Esse pagamento NÃO pode entrar no cálculo da fatura de
+transição (regra 3.1 já considera só EXPENSE) nem aparecer como receita no extrato —
+por isso a decisão atual de esconder todo INCOME de cartão.
+
+O PROBLEMA A REVISITAR
+----------------------
+Existem dois tipos de INCOME de cartão e hoje tratamos os dois igual (escondendo):
+
+  1. PAGAMENTO da fatura  -> correto esconder. Não abate o ciclo atual; é a quitação
+                             de uma fatura anterior já fechada.
+  2. ESTORNO / reembolso  -> NÃO deveria ser escondido. Um estorno (devolução de uma
+                             compra, chargeback, cashback) REDUZ o valor que se deve
+                             no ciclo. Hoje, escondê-lo faz a fatura de transição ficar
+                             SUPERESTIMADA (a compra estornada continua somando como
+                             EXPENSE, mas a devolução não abate).
+
+POR QUE NÃO RESOLVEMOS AGORA
+---------------------------
+- A conta atual do usuário não tem nenhum estorno, então não dá pra validar o
+  comportamento com dado real.
+- Distinguir pagamento de estorno provavelmente exige olhar a categoria/descrição da
+  Pluggy (ou algum campo de creditCardMetadata), e ainda não sabemos o formato exato.
+
+QUANDO HOUVER UM ESTORNO REAL, DECIDIR:
+---------------------------------------
+- Como distinguir, no retorno da Pluggy, PAGAMENTO de ESTORNO (categoria? sinal?
+  metadata? descrição?).
+- Estorno deve abater a fatura de transição (Σ EXPENSE - Σ ESTORNO) e/ou aparecer
+  como item negativo dentro da fatura.
+- Pagamento continua escondido (ou vira um "lançamento de quitação" à parte, ligado
+  à fatura que ele pagou).

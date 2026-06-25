@@ -25,9 +25,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.joaolucas.finance_tracker.dto.transaction.LedgerEntryDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionRequestDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
 import com.joaolucas.finance_tracker.entity.Category;
+import com.joaolucas.finance_tracker.entity.CreditCardBill;
 import com.joaolucas.finance_tracker.entity.Transaction;
 import com.joaolucas.finance_tracker.entity.TransactionType;
 import com.joaolucas.finance_tracker.entity.User;
@@ -51,6 +53,8 @@ class TransactionServiceTest {
     private TransactionMapper transactionMapper;
     @Mock
     private TransactionRepository transactionRepository;
+    @Mock
+    private BillService billService;
 
     @InjectMocks
     private TransactionService transactionService;
@@ -161,18 +165,18 @@ class TransactionServiceTest {
 
         List<Transaction> mockReturn = List.of(transaction);
 
-        when(transactionRepository.findByUserIdAndDateBetweenOrderByDateDescIdAsc(eq(user.getId()), any(), any()))
+        when(transactionRepository.findVisibleLedgerEntries(eq(user.getId()), any(), any(), any(), any()))
                 .thenReturn(mockReturn);
 
         when(transactionMapper.toDTO(transaction))
                 .thenReturn(dto);
 
         // when
-        List<TransactionResponseDTO> result = this.transactionService.getByAuthenticatedUser(null, null);
+        List<LedgerEntryDTO> result = this.transactionService.getByAuthenticatedUser(null, null);
 
         // then
         assertEquals(1, result.size());
-        assertEquals(dto, result.get(0));
+        assertEquals(dto, result.get(0).getTransaction());
         verify(transactionMapper).toDTO(any());
     }
 
@@ -181,11 +185,11 @@ class TransactionServiceTest {
         // given
         when(authService.getAuthenticatedUser()).thenReturn(user);
 
-        when(transactionRepository.findByUserIdAndDateBetweenOrderByDateDescIdAsc(eq(user.getId()), any(), any()))
+        when(transactionRepository.findVisibleLedgerEntries(eq(user.getId()), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         // when
-        List<TransactionResponseDTO> result = this.transactionService.getByAuthenticatedUser(null, null);
+        List<LedgerEntryDTO> result = this.transactionService.getByAuthenticatedUser(null, null);
 
         // then
         assertTrue(result.isEmpty());
@@ -204,7 +208,8 @@ class TransactionServiceTest {
         );
 
         assertEquals("Usuário autenticado não encontrado", exception.getMessage());
-        verify(transactionRepository, never()).findByUserIdAndDateBetweenOrderByDateDescIdAsc(anyLong(), any(), any());
+        verify(transactionRepository, never())
+                .findVisibleLedgerEntries(anyLong(), any(), any(), any(), any());
         verify(transactionMapper, never()).toDTO(any());
     }
 
@@ -337,6 +342,27 @@ class TransactionServiceTest {
                 () -> transactionService.update(5L, new TransactionRequestDTO())
         );
         verify(transactionRepository, never()).save(any());
+    }
+
+    // ===== DELETE =====
+    @Test
+    void delete$shouldThrowConflictWhenTransactionBelongsToBill() {
+        // given
+        CreditCardBill bill = CreditCardBill.builder().id(7L).build();
+        Transaction existing = Transaction.builder()
+                .id(5L).user(user).bill(bill).build();
+
+        when(authService.getAuthenticatedUser()).thenReturn(user);
+        when(transactionRepository.findById(5L)).thenReturn(Optional.of(existing));
+
+        // when + then
+        ConflictException exception = assertThrows(
+                ConflictException.class,
+                () -> transactionService.delete(5L)
+        );
+
+        assertEquals("Transações de fatura não podem ser removidas", exception.getMessage());
+        verify(transactionRepository, never()).delete(any());
     }
 
     // ===== UTILITY METHODS =====

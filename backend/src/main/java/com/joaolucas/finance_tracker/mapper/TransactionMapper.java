@@ -30,6 +30,8 @@ public class TransactionMapper {
                 .date(transaction.getDate())
                 .category(categoryMapper.toDTO(transaction.getCategory()))
                 .imported(transaction.isImported())
+                .installmentNumber(transaction.getInstallmentNumber())
+                .totalInstallments(transaction.getTotalInstallments())
                 .build();
     }
 

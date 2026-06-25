@@ -239,8 +239,9 @@ class TransactionIntegrationTest extends AbstractIntegrationTest {
                             .header("Authorization", bearerToken(user.getId())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(2))
-                    .andExpect(jsonPath("$[0].description").value("Transaction 1"))
-                    .andExpect(jsonPath("$[1].description").value("Transaction 2"));
+                    .andExpect(jsonPath("$[0].type").value("TRANSACTION"))
+                    .andExpect(jsonPath("$[0].transaction.description").value("Transaction 1"))
+                    .andExpect(jsonPath("$[1].transaction.description").value("Transaction 2"));
         }
 
         @Test
@@ -307,7 +308,7 @@ class TransactionIntegrationTest extends AbstractIntegrationTest {
                             .header("Authorization", bearerToken(user.getId())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(1))
-                    .andExpect(jsonPath("$[0].description").value("June tx"));
+                    .andExpect(jsonPath("$[0].transaction.description").value("June tx"));
         }
 
         @Test

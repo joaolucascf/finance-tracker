@@ -48,4 +48,18 @@ public class Transaction {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_account_id")
     private FinancialAccount sourceAccount;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bill_id")
+    private CreditCardBill bill;
+
+    /** Raw category as reported by the open-finance provider (e.g. Pluggy's "Investments"); null for manual transactions. */
+    @Column(name = "provider_category", length = 80)
+    private String providerCategory;
+
+    @Column(name = "installment_number")
+    private Integer installmentNumber;
+
+    @Column(name = "total_installments")
+    private Integer totalInstallments;
 }

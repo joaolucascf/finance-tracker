@@ -1,0 +1,7 @@
+1) Todas as faturas retornadas do Pluggy são faturas FECHADAS, até a com a data de vencimento mais próxima, se data de vencimento está no passado, não faz o menor sentido ser uma fatura aberta.
+2) Uma limitação da API da Pluggy é que em /bills ela só retorna as últimas 12 faturas, isso significa que no momento em que a fatura que no momento está aberta fechar, a última fatura da sequence é perdida, a sincronização não pode recuperá-la e a perda do dado no DB é permanente, quanto a fonte da verdade desse dado, podemos ficar tranquilos, pois a probabilidade de uma fatura que já foi fechada a 1 ano ser alterada é muito perto de 0.
+3) Para cada cartão de crédito, uma "fatura de transição" será criada, ela representa a fatura aberta.
+	Regras da fatura de transição: 
+		3.1) O valor total dela é a soma de todas as transações pertencentes ao cartão de crédito da fatura que não tenham um billId e sejam do tipo EXPENSE
+		3.2) A data de vencimento será no mesmo dia da fatura anterior, um mês no futuro.
+4) Quando a fatura aberta é fechada, a sincronização recebe essa fatura com o totalAmount correto e todas as suas transições que antes tinham billId nulo passam a ter billId, nesse momento, a fatura de transição fecha, passa a acessar o valor do totalAmount e dueDate como fonte da verdade e uma nova fatura de transição é aberta como todas as faturas que continuam com billId nulo.

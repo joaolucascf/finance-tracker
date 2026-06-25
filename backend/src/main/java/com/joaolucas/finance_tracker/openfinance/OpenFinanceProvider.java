@@ -14,4 +14,6 @@ public interface OpenFinanceProvider {
     List<AccountData> getAccounts(String externalItemId);
 
     List<TransactionData> getTransactions(String externalAccountId, LocalDate from, LocalDate to);
+
+    List<BillData> getBills(String externalAccountId);
 }

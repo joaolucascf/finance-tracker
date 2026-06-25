@@ -26,4 +26,6 @@ public class TransactionResponseDTO {
     private LocalDate date;
     private CategoryResponseDTO category;
     private boolean imported;
+    private Integer installmentNumber;
+    private Integer totalInstallments;
 }

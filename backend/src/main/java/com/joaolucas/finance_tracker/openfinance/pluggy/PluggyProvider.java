@@ -3,6 +3,7 @@ package com.joaolucas.finance_tracker.openfinance.pluggy;
 import com.joaolucas.finance_tracker.entity.AccountType;
 import com.joaolucas.finance_tracker.entity.TransactionType;
 import com.joaolucas.finance_tracker.openfinance.AccountData;
+import com.joaolucas.finance_tracker.openfinance.BillData;
 import com.joaolucas.finance_tracker.openfinance.ItemStatus;
 import com.joaolucas.finance_tracker.openfinance.OpenFinanceProvider;
 import com.joaolucas.finance_tracker.openfinance.TransactionData;
@@ -108,6 +109,23 @@ public class PluggyProvider implements OpenFinanceProvider {
         return all;
     }
 
+    @Override
+    public List<BillData> getBills(String externalAccountId) {
+        BillsResponse response = restClient.get()
+                .uri("/bills?accountId={id}", externalAccountId)
+                .header("X-API-KEY", getApiKey())
+                .retrieve()
+                .body(BillsResponse.class);
+        if (response == null || response.results() == null) return List.of();
+        return response.results().stream()
+                .map(b -> new BillData(
+                        b.id(),
+                        parseDate(b.dueDate()),
+                        BigDecimal.valueOf(b.totalAmount() != null ? b.totalAmount() : 0.0)
+                ))
+                .toList();
+    }
+
     private synchronized String getApiKey() {
         if (cachedApiKey == null || Instant.now().isAfter(apiKeyExpiry.minus(Duration.ofMinutes(5)))) {
             AuthResponse auth = restClient.post()
@@ -137,7 +155,18 @@ public class PluggyProvider implements OpenFinanceProvider {
         if (description != null && description.length() > 60) {
             description = description.substring(0, 60);
         }
-        return new TransactionData(tx.id(), description, amount, type, date);
+
+        String billId = null;
+        Integer installmentNumber = null;
+        Integer totalInstallments = null;
+        if (tx.creditCardMetadata() != null) {
+            billId = tx.creditCardMetadata().billId();
+            installmentNumber = tx.creditCardMetadata().installmentNumber();
+            totalInstallments = tx.creditCardMetadata().totalInstallments();
+        }
+
+        return new TransactionData(tx.id(), description, amount, type, date,
+                tx.category(), billId, installmentNumber, totalInstallments);
     }
 
     private LocalDate parseDate(String dateStr) {
@@ -157,5 +186,10 @@ public class PluggyProvider implements OpenFinanceProvider {
     record AccountsResponse(List<PluggyAccount> results) {}
     record PluggyAccount(String id, String itemId, String type, String name, Double balance, String currencyCode) {}
     record V2TransactionsResponse(List<PluggyTransaction> results, String next) {}
-    record PluggyTransaction(String id, String accountId, String description, Double amount, String date, String type) {}
+    record PluggyTransaction(String id, String accountId, String description, Double amount, String date, String type,
+                             String category, CreditCardMetadata creditCardMetadata) {
+        record CreditCardMetadata(String billId, Integer installmentNumber, Integer totalInstallments) {}
+    }
+    record BillsResponse(List<PluggyBill> results) {}
+    record PluggyBill(String id, String dueDate, Double totalAmount) {}
 }

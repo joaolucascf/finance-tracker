@@ -10,5 +10,9 @@ public record TransactionData(
         String description,
         BigDecimal amount,
         TransactionType type,
-        LocalDate date
+        LocalDate date,
+        String category,
+        String billId,
+        Integer installmentNumber,
+        Integer totalInstallments
 ) {}

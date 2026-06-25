@@ -23,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.joaolucas.finance_tracker.dto.transaction.LedgerEntryDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionRequestDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
 import com.joaolucas.finance_tracker.entity.TransactionType;
@@ -115,7 +116,7 @@ class TransactionControllerTest {
     @Test
     void getAllFromAuthenticatedUser$shouldReturn200WithList() throws Exception {
         when(transactionService.getByAuthenticatedUser(any(), any()))
-                .thenReturn(List.of(new TransactionResponseDTO()));
+                .thenReturn(List.of(new LedgerEntryDTO()));
 
         mockMvc.perform(get("/transactions"))
                 .andExpect(status().isOk());

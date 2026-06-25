@@ -1,9 +1,9 @@
 import { getTransactions } from "@/services/transactions";
-import { Transaction } from "@/types/transactions";
+import { LedgerEntry } from "@/types/transactions";
 import { useCallback, useEffect, useState } from "react";
 
 export function useTransactions(year: number, month: number) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,7 +15,7 @@ export function useTransactions(year: number, month: number) {
       const data = await getTransactions(year, month);
       if (!data) return;
 
-      setTransactions(data);
+      setEntries(data);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Erro ao carregar transações",
@@ -30,7 +30,7 @@ export function useTransactions(year: number, month: number) {
   }, [load]);
 
   return {
-    transactions,
+    entries,
     loading,
     error,
     reload: load,

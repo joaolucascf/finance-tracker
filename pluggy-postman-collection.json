@@ -1,0 +1,103 @@
+{
+  "info": {
+    "name": "Pluggy API - finance-app (raw)",
+    "description": "Coleção para inspecionar os retornos crus da Pluggy. O /auth grava o apiKey nas variáveis da coleção automaticamente; rode-o primeiro e o resto usa o header X-API-KEY sozinho. IDs (item_id / account_id) já vêm preenchidos com os dados conectados no banco local.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://api.pluggy.ai" },
+    { "key": "client_id", "value": "", "description": "PLUGGY_CLIENT_ID do seu .env" },
+    { "key": "client_secret", "value": "", "description": "PLUGGY_CLIENT_SECRET do seu .env" },
+    { "key": "api_key", "value": "", "description": "preenchido automaticamente pelo POST /auth" },
+    { "key": "item_id", "value": "4a325da3-a622-456b-b96c-c368f8fe7ee7", "description": "conexão ACTIVE no banco local" },
+    { "key": "account_id", "value": "444f2fcc-cd88-41f1-baae-f8d617b06b16", "description": "conta CARTAO_CREDITO (a que tem faturas)" },
+    { "key": "date_from", "value": "2026-03-01" },
+    { "key": "date_to", "value": "2026-06-30" }
+  ],
+  "item": [
+    {
+      "name": "1. POST /auth (gera apiKey)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json && json.apiKey) {",
+              "  pm.collectionVariables.set('api_key', json.apiKey);",
+              "  console.log('apiKey gravado nas variaveis da colecao');",
+              "} else {",
+              "  console.error('Resposta sem apiKey:', json);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth", "host": ["{{base_url}}"], "path": ["auth"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"clientId\": \"{{client_id}}\",\n  \"clientSecret\": \"{{client_secret}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "2. GET /items/{itemId} (status da conexao)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-KEY", "value": "{{api_key}}" }],
+        "url": { "raw": "{{base_url}}/items/{{item_id}}", "host": ["{{base_url}}"], "path": ["items", "{{item_id}}"] }
+      }
+    },
+    {
+      "name": "3. GET /accounts?itemId= (contas + creditData)",
+      "description": "Repare no bloco creditData de cada conta CREDIT: balanceCloseDate / balanceDueDate / brandName / availableCreditLimit.",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-KEY", "value": "{{api_key}}" }],
+        "url": {
+          "raw": "{{base_url}}/accounts?itemId={{item_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["accounts"],
+          "query": [{ "key": "itemId", "value": "{{item_id}}" }]
+        }
+      }
+    },
+    {
+      "name": "4. GET /bills?accountId= (faturas cruas)",
+      "description": "Aqui voce ve dueDate, totalAmount, minimumPayment, allowsInstallments, financeCharges. Confirme se vem ou nao alguma data de fechamento por fatura.",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-KEY", "value": "{{api_key}}" }],
+        "url": {
+          "raw": "{{base_url}}/bills?accountId={{account_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["bills"],
+          "query": [{ "key": "accountId", "value": "{{account_id}}" }]
+        }
+      }
+    },
+    {
+      "name": "5. GET /v2/transactions (compras + creditCardMetadata)",
+      "description": "creditCardMetadata.billId liga a transacao a uma fatura; installmentNumber/totalInstallments/purchaseDate tambem vem aqui.",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-KEY", "value": "{{api_key}}" }],
+        "url": {
+          "raw": "{{base_url}}/v2/transactions?accountId={{account_id}}&dateFrom={{date_from}}&dateTo={{date_to}}&pageSize=200",
+          "host": ["{{base_url}}"],
+          "path": ["v2", "transactions"],
+          "query": [
+            { "key": "accountId", "value": "{{account_id}}" },
+            { "key": "dateFrom", "value": "{{date_from}}" },
+            { "key": "dateTo", "value": "{{date_to}}" },
+            { "key": "pageSize", "value": "200" }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -3,22 +3,16 @@
 import { useState } from "react";
 import TransactionForm from "./components/TransactionForm";
 import { PeriodSelector } from "./components/PeriodSelector";
+import { BillRow } from "./components/BillRow";
+import { useInlineDescription } from "./components/useInlineDescription";
+import { InlineDescriptionBar } from "./components/InlineDescriptionBar";
 import { useTransactions } from "@/hooks/useTransactions";
 import { Modal } from "@/components/ui/Modal";
 import { Toast } from "@/components/ui/Toast";
-import { FormState, Transaction } from "@/types/transactions";
+import { Bill, FormState, Transaction } from "@/types/transactions";
 import { deleteTransaction } from "@/services/transactions";
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
-
-function formatDate(dateStr: string) {
-  return `Dia ${new Date(dateStr + "T00:00:00").getDate()}`;
-}
+import { renameBill } from "@/services/bills";
+import { formatCurrency, formatDay } from "@/lib/format";
 
 function toFormState(t: Transaction): FormState {
   return {
@@ -37,13 +31,14 @@ export default function TransactionsPage() {
     month: now.getMonth() + 1,
   });
 
-  const { transactions, loading, error, reload } = useTransactions(
+  const { entries, loading, error, reload } = useTransactions(
     period.year,
     period.month,
   );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [billToRename, setBillToRename] = useState<Bill | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -59,12 +54,16 @@ export default function TransactionsPage() {
     }
   }
 
-  const totalIncome = transactions
-    .filter((t) => t.type === "INCOME")
-    .reduce((s, t) => s + t.amount, 0);
-  const totalExpense = transactions
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((s, t) => s + t.amount, 0);
+  let totalIncome = 0;
+  let totalExpense = 0;
+  for (const entry of entries) {
+    if (entry.type === "TRANSACTION" && entry.transaction) {
+      if (entry.transaction.type === "INCOME") totalIncome += entry.transaction.amount;
+      else totalExpense += entry.transaction.amount;
+    } else if (entry.type === "BILL" && entry.bill) {
+      totalExpense += entry.bill.total;
+    }
+  }
   const balance = totalIncome - totalExpense;
 
   return (
@@ -150,7 +149,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Empty state */}
-      {!loading && !error && transactions.length === 0 && (
+      {!loading && !error && entries.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-12 h-12 rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center mb-4">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -171,18 +170,38 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Transaction list */}
-      {!loading && !error && transactions.length > 0 && (
+      {/* Ledger list */}
+      {!loading && !error && entries.length > 0 && (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-          {transactions.map((t, i) => (
-            <TransactionItem
-              key={t.id}
-              transaction={t}
-              last={i === transactions.length - 1}
-              onEdit={() => setTransactionToEdit(t)}
-              onDelete={() => setTransactionToDelete(t)}
-            />
-          ))}
+          {entries.map((entry, i) => {
+            const last = i === entries.length - 1;
+            if (entry.type === "BILL" && entry.bill) {
+              return (
+                <BillRow
+                  key={`bill-${entry.bill.id}`}
+                  bill={entry.bill}
+                  last={last}
+                  onRename={() => setBillToRename(entry.bill)}
+                  onItemSaved={reload}
+                  onError={(message) => setToast(message)}
+                />
+              );
+            }
+            if (entry.transaction) {
+              return (
+                <TransactionItem
+                  key={`tx-${entry.transaction.id}`}
+                  transaction={entry.transaction}
+                  last={last}
+                  onEditModal={() => setTransactionToEdit(entry.transaction)}
+                  onInlineSaved={reload}
+                  onError={(message) => setToast(message)}
+                  onDelete={() => setTransactionToDelete(entry.transaction)}
+                />
+              );
+            }
+            return null;
+          })}
         </div>
       )}
 
@@ -214,6 +233,22 @@ export default function TransactionsPage() {
             onError={(err) => {
               setTransactionToEdit(null);
               setToast(err.message);
+            }}
+          />
+        )}
+      </Modal>
+
+      <Modal isOpen={!!billToRename} onClose={() => setBillToRename(null)}>
+        {billToRename && (
+          <RenameBillForm
+            bill={billToRename}
+            onSuccess={() => {
+              setBillToRename(null);
+              reload();
+            }}
+            onError={(message) => {
+              setBillToRename(null);
+              setToast(message);
             }}
           />
         )}
@@ -261,18 +296,76 @@ export default function TransactionsPage() {
   );
 }
 
+function RenameBillForm({
+  bill,
+  onSuccess,
+  onError,
+}: {
+  bill: Bill;
+  onSuccess: () => void;
+  onError: (message: string) => void;
+}) {
+  const [name, setName] = useState(bill.name);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (isSaving || !name.trim()) return;
+    setIsSaving(true);
+    try {
+      await renameBill(bill.id, name.trim());
+      onSuccess();
+    } catch (err) {
+      const message =
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "Erro ao renomear fatura";
+      onError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <h2 className="text-[var(--color-text)] text-lg font-semibold">
+        Renomear fatura
+      </h2>
+      <input
+        autoFocus
+        value={name}
+        maxLength={60}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full bg-[var(--color-raised)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[var(--color-text)] text-sm focus:outline-none focus:border-[var(--color-teal)] transition-colors"
+      />
+      <button
+        type="submit"
+        disabled={isSaving || !name.trim()}
+        className="w-full py-3 rounded-lg bg-[var(--color-teal)] text-white font-semibold text-sm hover:bg-[var(--color-teal-dark)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+      >
+        {isSaving ? "Salvando..." : "Salvar"}
+      </button>
+    </form>
+  );
+}
+
 function TransactionItem({
   transaction: t,
   last,
-  onEdit,
+  onEditModal,
+  onInlineSaved,
+  onError,
   onDelete,
 }: {
   transaction: Transaction;
   last: boolean;
-  onEdit: () => void;
+  onEditModal: () => void;
+  onInlineSaved: () => void;
+  onError: (message: string) => void;
   onDelete: () => void;
 }) {
   const isIncome = t.type === "INCOME";
+  const inline = useInlineDescription(t, onInlineSaved, onError);
 
   return (
     <div
@@ -280,67 +373,79 @@ function TransactionItem({
         !last ? "border-b border-[var(--color-border)]" : ""
       }`}
     >
-      {/* Color dot */}
-      <div
-        className="w-2 h-2 rounded-full flex-shrink-0"
-        style={{
-          backgroundColor: isIncome
-            ? "var(--color-income)"
-            : "var(--color-expense)",
-        }}
-      />
+      {inline.editing ? (
+        <InlineDescriptionBar
+          value={inline.value}
+          onChange={inline.setValue}
+          onSave={inline.save}
+          onCancel={inline.cancel}
+          saving={inline.saving}
+        />
+      ) : (
+        <>
+          {/* Color dot */}
+          <div
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{
+              backgroundColor: isIncome
+                ? "var(--color-income)"
+                : "var(--color-expense)",
+            }}
+          />
 
-      {/* Description + category */}
-      <div className="flex-1 min-w-0">
-        <p className="text-[var(--color-text)] text-sm font-medium truncate">
-          {t.description}
-        </p>
-        {t.category && (
-          <span className="text-[var(--color-muted)] text-xs">
-            {t.category.name}
+          {/* Description + category */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[var(--color-text)] text-sm font-medium truncate">
+              {t.description}
+            </p>
+            {t.category && (
+              <span className="text-[var(--color-muted)] text-xs">
+                {t.category.name}
+              </span>
+            )}
+          </div>
+
+          {/* Date */}
+          <span className="text-[var(--color-muted)] text-xs flex-shrink-0">
+            {formatDay(t.date)}
           </span>
-        )}
-      </div>
 
-      {/* Date */}
-      <span className="text-[var(--color-muted)] text-xs flex-shrink-0">
-        {formatDate(t.date)}
-      </span>
-
-      {/* Amount + actions */}
-      <div className="flex items-center gap-2 flex-shrink-0 w-32 justify-end">
-        <button
-          onClick={onEdit}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-teal)] hover:bg-[var(--color-border)] cursor-pointer"
-          aria-label="Editar transação"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-          </svg>
-        </button>
-        <button
-          onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-expense)] hover:bg-[var(--color-border)] cursor-pointer"
-          aria-label="Excluir transação"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-          </svg>
-        </button>
-        <span
-          className="text-sm font-semibold text-right"
-          style={{
-            color: isIncome ? "var(--color-income)" : "var(--color-expense)",
-          }}
-        >
-          {isIncome ? "+" : "−"}
-          {formatCurrency(t.amount)}
-        </span>
-      </div>
+          {/* Amount + actions */}
+          <div className="flex items-center gap-2 flex-shrink-0 w-32 justify-end">
+            <button
+              onClick={() => (t.imported ? inline.start() : onEditModal())}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-teal)] hover:bg-[var(--color-border)] cursor-pointer"
+              aria-label="Editar transação"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+            </button>
+            <button
+              onClick={onDelete}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-expense)] hover:bg-[var(--color-border)] cursor-pointer"
+              aria-label="Excluir transação"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+            <span
+              className="text-sm font-semibold text-right"
+              style={{
+                color: isIncome ? "var(--color-income)" : "var(--color-expense)",
+              }}
+            >
+              {isIncome ? "+" : "−"}
+              {formatCurrency(t.amount)}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

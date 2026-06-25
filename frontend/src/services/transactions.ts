@@ -1,4 +1,4 @@
-import { FormState } from "@/types/transactions";
+import { FormState, Transaction } from "@/types/transactions";
 import { apiFetch } from "./api";
 
 export async function getTransactions(year?: number, month?: number) {
@@ -20,6 +20,20 @@ export async function updateTransaction(id: number, data: FormState) {
   return apiFetch(`/transactions/${id}`, {
     method: "PUT",
     body: JSON.stringify(data),
+  });
+}
+
+/** Updates only the description, keeping every other (locked) field as-is. For imported/bill transactions. */
+export async function updateTransactionDescription(
+  t: Transaction,
+  description: string,
+) {
+  return updateTransaction(t.id, {
+    description,
+    amount: t.amount,
+    type: t.type,
+    categoryId: t.category ? t.category.id : null,
+    date: t.date,
   });
 }
 

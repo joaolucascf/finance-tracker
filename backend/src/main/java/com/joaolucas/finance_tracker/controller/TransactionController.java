@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.joaolucas.finance_tracker.dto.transaction.LedgerEntryDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionRequestDTO;
 import com.joaolucas.finance_tracker.dto.transaction.TransactionResponseDTO;
 import com.joaolucas.finance_tracker.service.TransactionService;
@@ -39,7 +40,7 @@ public class TransactionController {
     }
 
     @GetMapping
-    public List<TransactionResponseDTO> getAllFromAuthenticatedUser(
+    public List<LedgerEntryDTO> getAllFromAuthenticatedUser(
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month) {
         return transactionService.getByAuthenticatedUser(year, month);
